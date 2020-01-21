@@ -1,0 +1,20 @@
+# This is a full line comment
+latt_abc_len 1.0    
+linkage_list 0.5    # And this is a continuation comment
+{
+    size    3
+}
+molecule_number 1.0
+molecule_mass 1.0
+{
+	Z = 1
+}
+molecule_com_linkage 1.0
+{
+	Z = 1	
+}
+molecule_rot_linkage 1.0
+{
+    Z = 1
+    twist_axis = 1 0 0
+}

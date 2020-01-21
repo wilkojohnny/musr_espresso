@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+
+# look through all the pwo files, and see what's done, what needs resubmitting,
+# and what has failed compeltely
+
+# define colours
+RED='\033[0;31m'
+LRED='\033[1;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;36m'
+LBLUE='\033[1;36m'
+NC='\033[0m' # No Color
+
+# function to extract the run ID for SLURM from the pw.x input files
+function extract_slurm_name {
+  # get the file filename
+  pwi_file=$1
+  filename_components=$(echo $pwi_file | tr "." "\n")
+  for fn_component in $filename_components; do
+    if [[ ${fn_component} =~ ^[0-9]+$ ]]; then
+      long_slurm_name="${fn_component}${pwi_file}"
+      echo ${long_slurm_name:0:8}
+    fi
+  done
+}
+
+function resubmit {
+  pwo_file=$1
+  pwi_file="${pwo_file%?}i"
+  slurm_file="${pwi_file}_slurm.run"
+  # check the run has not already been submitted:
+  # get the run number from the run
+  slurm_name="$(extract_slurm_name ${pwi_file})"
+  squeue -u mans3765 | grep ${slurm_name} > /dev/null
+
+
+  if [[ $? -eq 1 ]] ; then
+    # replace 'from_scratch' with 'restart'
+    sed -i 's/from_scratch/restart/g' ${pwi_file}
+
+    # resubmit the run if successful
+    if [[ $? -eq 0 ]] ; then
+      # resubmit the run
+      sbatch ${slurm_file} > /dev/null
+      if [[ $? -eq 0 ]] ; then
+        printf "${LBLUE} - resubmitted ✅\n"
+      else
+        printf "${RED} - not resubmitted 🤯\n"
+      fi
+    else
+      printf "${RED} - not resubmitted 🤯\n"
+    fi
+  else
+    # already running
+    printf "${GREEN} - already submitted ⏱\n"
+  fi
+}
+
+
+# print out the completed scf runs
+printf "${GREEN}Completed SCF runs:\n"
+for pwo_file in *.pwo; do
+  # do a grep
+  grep -q 'Begin final coordinates' ${pwo_file}
+  # if grep is successful, print the file name
+  if  [[ $? -eq 0 ]] ; then
+    printf "${pwo_file}\n"
+  fi
+done
+
+printf "\n"
+
+# print out incompleted (but not failed) scf runs
+printf "${BLUE}Incomplete SCF runs - may need resubmitting:\n"
+for pwo_file in *.pwo; do
+  # do a grep
+  grep -q 'Maximum CPU time exceeded' ${pwo_file}
+  # if grep is successful, print out file name, try to restart
+
+  if  [[ $? -eq 0 ]] ; then
+    printf "${BLUE}${pwo_file}"
+    resubmit $pwo_file
+
+  else
+    # if it doesn't say the maxiumum time is exceeded, it might still need resubmitting.
+    # check for this by getting the runs which are finished (that say 'JOB DONE')
+    grep -ql 'JOB DONE' $pwo_file
+    if  [[ $? -eq 0 ]] ; then
+       # if the file does not contain the final coordinates and does not say 'convergence NOT achieved', then
+       grep -lq -e 'final coordinates' -e 'NOT achieved' -e '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%' $pwo_file
+       if [[ $? -eq 1 ]] ; then
+         # this file is done but not finished, and no errors - so resubmit if needed
+         printf "${BLUE}${pwo_file}"
+         resubmit $pwo_file
+       fi
+    fi
+  fi
+done
+
+printf "\n"
+
+# now print out the completely failed runs
+printf "${RED}Failed SCF runs - need looking into:\n"
+for pwo_file in *.pwo; do
+  # do a grep
+  grep -q -e 'convergence NOT achieved after 100 iterations: stopping' -e '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%' ${pwo_file}
+  # if grep is successful, print the file name
+  if  [[ $? -eq 0 ]] ; then
+    printf "${pwo_file}\n"
+  fi
+done
+
+printf "\n"
+
+# also print runs which haven't even started
+printf "${LRED}Failed SCF runs - didn't even start:\n"
+grep -L 'iteration #' *.pwo
+
+# put the text colour back to normal
+printf "${NC}"

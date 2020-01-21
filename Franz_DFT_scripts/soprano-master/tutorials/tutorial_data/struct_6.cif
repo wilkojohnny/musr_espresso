@@ -1,0 +1,21 @@
+data_image0
+_cell_length_a       5.81818
+_cell_length_b       2.88819
+_cell_length_c       2.92231
+_cell_angle_alpha    89.8861
+_cell_angle_beta     89.9961
+_cell_angle_gamma    90.044
+
+loop_
+  _atom_site_label
+  _atom_site_occupancy
+  _atom_site_fract_x
+  _atom_site_fract_y
+  _atom_site_fract_z
+  _atom_site_thermal_displace_type
+  _atom_site_B_iso_or_equiv
+  _atom_site_type_symbol
+  Fe1      1.0000 -0.01191  0.02735  0.02847  Biso   1.000  Fe
+  Fe2      1.0000 0.24648  0.51528  0.52657  Biso   1.000  Fe
+  Fe3      1.0000 0.50019  0.01697  -0.02470  Biso   1.000  Fe
+  Fe4      1.0000 0.75615  0.50231  0.49079  Biso   1.000  Fe
