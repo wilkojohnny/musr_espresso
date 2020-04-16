@@ -15,8 +15,7 @@ import copy  # to create copies of the structure
 
 
 # define pseudopotential file names
-pseudopotentials = { 'K': 'K.pbe-spn-rrkjus_psl.1.0.0.UPF',
-                     'P': 'P.pbe-nl-rrkjus_psl.1.0.0.UPF',
+pseudopotentials = { 'Y': 'Y.pbe-spn-rrkjus_psl.1.0.0.UPF',
                      'F': 'F.pbe-n-rrkjus_psl.1.0.0.UPF'}
 
 
@@ -24,8 +23,8 @@ def main():
 
     input_data = {
         'system': {
-             'ecutwfc': 70,
-             'ecutrho': 550,
+             'ecutwfc': 75,
+             'ecutrho': 600,
              #'lda_plus_u': True,
              #'Hubbard_U(1)': 3,
              # 'occupations': 'smearing',
@@ -37,7 +36,7 @@ def main():
         }
     }
 
-    cif_location = 'KPF6.cif'
+    cif_location = 'YF3.cif'
 
     # get the atoms
     atoms = io.read(cif_location)
@@ -49,7 +48,7 @@ def main():
     all_parameters = []
     dE = []
     for nk in range(3, 4):
-        parameters = np.arange(200, 800, 50)
+        parameters = np.arange(700, 850, 50)
         parameters, energies = sweep(atoms, input_data, 'system', 'ecutrho', nk, parameters)
         close_atoms_parameters, close_energy = sweep(close_atoms, input_data, 'system', 'ecutrho', nk, parameters)
         all_parameters.append(close_atoms_parameters)
@@ -68,7 +67,7 @@ def main():
 
         dE.append(this_dE)
 
-    gle_utils.plot_xy(all_parameters, dE, 'ecutrho and scf energy, KPF\\textsubscript{6}', legend="nk=3") #["nk=" + str(i) for i in range(2, 6)])
+    gle_utils.plot_xy(all_parameters, dE, 'ecutrho and scf energy, YF\\textsubscript{3}', legend="nk=3")#["nk=" + str(i) for i in range(2, 7)])
 
     return 1
 

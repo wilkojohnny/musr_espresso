@@ -2,7 +2,7 @@
 from __future__ import print_function #python 2-3 compatible printing function
 import timeit, sys
 import numpy as np
-from ase import io, Atoms, spacegroup  # https://wiki.fysik.dtu.dk/ase/ase/atoms.html#list-of-all-methods
+from ase import io, Atoms, Atom, spacegroup, visualize  # https://wiki.fysik.dtu.dk/ase/ase/atoms.html#list-of-all-methods
 import utilities
 import copy
 
@@ -40,7 +40,7 @@ def point_grid(input_structure,xgrid=1,ygrid=1,zgrid=1,random=None,rand_factor=1
     else:
         struct = input_structure
         filename = 'structure'
-    
+
     N_max_approx=(struct.get_volume()-4*3.1415/3*prec_atom**3*struct.get_number_of_atoms())/(4*3.1415/3*prec_grid**3) #approximate number of maximum grid points
     if verbose in ['min', 'max']:
         print('Approximate maximum number of grid points based on prec_atom and prec_grid: ',str(int(N_max_approx)))
@@ -77,7 +77,7 @@ def point_grid(input_structure,xgrid=1,ygrid=1,zgrid=1,random=None,rand_factor=1
         spgsetting=set_spgsetting
         if verbose in ['min','max']:
             print('User setting: ',str(spgsetting))
-    
+
     # create the full grid of points depending on whether a regular or a random grid is wanted
     # regular grid: create xgrid*ygrid*zgrid regular grid of points
     if random is None:
@@ -99,7 +99,7 @@ def point_grid(input_structure,xgrid=1,ygrid=1,zgrid=1,random=None,rand_factor=1
     grid_selector=np.array([False for i in range(0,N_points)],dtype=bool)
     #start a timer
     start_time = timeit.default_timer()
-    
+
     # read in the structure again to create an independent copy
     if isinstance(input_structure, str):
         struct_dump = io.read(input_structure)
@@ -127,7 +127,7 @@ def point_grid(input_structure,xgrid=1,ygrid=1,zgrid=1,random=None,rand_factor=1
             #check distance of grid point to atoms of system
             point_atoms=Atoms(symbols=['X'],scaled_positions=[grid_point],cell=struct.get_cell()) #create an Atoms object for the grid point
             struct_dump.extend(point_atoms) #add the atoms object created from the grid point
-            point_atomdistances=struct_dump.get_distances(-1,range(0,struct_dump.get_number_of_atoms()-1),mic=True) #distances of all atoms and already kept grid points from the grid point at hand 
+            point_atomdistances=struct_dump.get_distances(-1,range(0,struct_dump.get_number_of_atoms()-1),mic=True) #distances of all atoms and already kept grid points from the grid point at hand
             struct_dump.pop() #remove the grid point from the original structure
             #print 'smallest atom dist.: '+str(np.min(point_atomdistances))
             if np.min(point_atomdistances)>prec_atom: #if the grid point is further than prec_atom (in Angstrom) from all atoms check further: its distance to already selected grid points
@@ -172,7 +172,7 @@ def point_grid(input_structure,xgrid=1,ygrid=1,zgrid=1,random=None,rand_factor=1
             if random is None: #if a regular grid was created
                 export_cifname=filename.rsplit('.',1)[0]+'_'+str(xgrid)+'x'+str(ygrid)+'x'+str(zgrid)+'grid.cif'
             else: #if a grid of random points was created
-                export_cifname=filename.rsplit('.',1)[0]+'_'+str(len(grid_survivors))+'randgrid.cif'            
+                export_cifname=filename.rsplit('.',1)[0]+'_'+str(len(grid_survivors))+'randgrid.cif'
             io.write(export_cifname,grid_cifexport)
             print('Exporting grid points to ',export_cifname,'.')
     if out_grid:
@@ -185,3 +185,73 @@ def point_grid(input_structure,xgrid=1,ygrid=1,zgrid=1,random=None,rand_factor=1
             return struct
         else:
             return
+
+
+def get_internuclei_positions(crystal_cell: Atoms, nn_nuclei: list = None, max_distance: float = 3.0, spg=None, prec_grid: float = 0.1) -> list:
+    """
+    Get a set of muon positions which are in between the nuclei with labels nn_nuclei. John Wilkinson, 16/4/2020
+    :param crystal_cell: cell of crystal to put the nuclei into
+    :param nn_nuclei: list of strings of the labels of the nn nuclei. Default is ['F'].
+    :param max_distance: maximum possible nn nuclei distance from each other
+    :param spg: space group of crystal
+    :param prec_grid: maximum distance between two muons during the symmetry analysis to be treated as the same
+    :return: list of SCALED positions of muons which are in between the nn_nuclei nuclei
+    """
+
+    if nn_nuclei is None:
+        nn_nuclei = ['F']
+
+    potential_positions = Atoms(cell=crystal_cell.get_cell())
+
+    # calculate all the cell distances initially (for speed)
+    cell_distances = crystal_cell.get_all_distances(mic=True)
+
+    # for each atom in crystal_cell
+    for i_atom in range(0, len(crystal_cell)):
+        # is this atom one of the ones we are interested in?
+        if crystal_cell[i_atom].symbol in nn_nuclei:
+            # get all the distances between this nuclei and the others
+            i_atom_distances = cell_distances[i_atom]
+            for j_atom in range(i_atom, len(i_atom_distances)):
+                # for each atom, if it has the correct symbol, *and* the distance is acceptable:
+                if crystal_cell[j_atom].symbol in nn_nuclei and max_distance > i_atom_distances[j_atom] > 0:
+                    this_potential_position = (crystal_cell[i_atom].position + crystal_cell[j_atom].position) / 2
+                    potential_positions.append(atom=Atom('H', this_potential_position, tag=i_atom+j_atom*len(crystal_cell)))
+
+    # now seek and destroy duplicates
+    # for each muon position
+    potential_positions_scaled = potential_positions.get_scaled_positions()
+    remove_list = []
+    for i_muon_position, muon_position in enumerate(potential_positions_scaled):
+        if i_muon_position not in remove_list:
+            sym_muon_positions_i = spacegroup.crystal('H', basis=muon_position, cell=potential_positions.get_cell(),
+                                                      spacegroup=spg)
+
+            for j_muon_position in range(i_muon_position+1, len(potential_positions)):
+                if j_muon_position not in remove_list:  # i.e if this one isn't already marked for removal
+                    sym_muon_positions_j = spacegroup.crystal('H', basis=potential_positions_scaled[j_muon_position],
+                                                              cell=potential_positions.get_cell(), spacegroup=spg)
+
+                    # now try to merge the two -- and if any of the distances are less than prec_grid, then rm j later
+                    sym_muon_positions_ij = copy.deepcopy(sym_muon_positions_i)
+                    for atom in sym_muon_positions_j:
+                        sym_muon_positions_ij.append(atom)
+
+                    dist = sym_muon_positions_ij.get_all_distances(mic=True)
+                    # this next line, in the ugliest way possible, finds the minimum distance above 0 (0 is
+                    min_dist = [min(dist[i][j] for i in range(0, len(dist[:])) for j in range(0, len(dist[:])) if i > j)]
+                    if min_dist[0] < prec_grid:
+                        print(i_muon_position)
+                        print(j_muon_position)
+                        remove_list.append(j_muon_position)
+
+    # now destroy duplicates
+    remove_list.sort(reverse=True)
+    print(remove_list)
+    for remove_item in remove_list:
+        potential_positions.pop(remove_item)
+        potential_positions_scaled = np.delete(potential_positions_scaled, remove_item, axis=0)
+
+    # visualize.view(potential_positions)
+
+    return potential_positions_scaled

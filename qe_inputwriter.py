@@ -32,23 +32,23 @@ def main():
     #                     'F': 'F.pbe-n-rrkjus_psl.1.0.0.UPF',
     #                     'H': 'H.pbe-rrkjus_psl.1.0.0.UPF'}
     #
-    pseudopotentials = {'Sc': 'Sc.pbe-spn-rrkjus_psl.1.0.0.UPF',
+    pseudopotentials = {'Y': 'Y.pbe-spn-rrkjus_psl.1.0.0.UPF',
                          'F': 'F.pbe-n-rrkjus_psl.1.0.0.UPF',
                          'H': 'H.pbe-rrkjus_psl.1.0.0.UPF'}
 
-    nk = 4  # number of k points
-    prefix = 'ScF3.relax.mu'  # prefix for pw.x
+    nk = (3, 3, 4)  # number of k points
+    prefix = 'YF3.relax.mu'  # prefix for pw.x
     runtime = 24*60*60 - 1  # maximum runtime of pw.x
-    ciffile_location = 'ScF3.cif'  # location of .cif structure file
-    output_directory = 'ScF3'
-    n_nodes = 4
+    ciffile_location = 'YF3.cif'  # location of .cif structure file
+    output_directory = 'YF3_interF'
+    n_nodes = 3
 
     # define additional inputs
     input_data['CONTROL'].update({'prefix': prefix,
                                   'restart_mode': 'from_scratch',
                                   'max_seconds': runtime})
     input_data['SYSTEM'] = {'tot_charge': +1.0,
-                            'ecutwfc': 65.,
+                            'ecutwfc': 75.,
                             'ecutrho': 550.,
                             'nspin': 1,
                             # 'lda_plus_u': True,
@@ -67,14 +67,13 @@ def main():
     crystal_cell = io.read(ciffile_location)
 
     # use pointgrid to find the muon positions
-    muon_positions = pointgrid.point_grid(crystal_cell, rand_factor=40, prec_atom=.2, prec_grid=.5, random=25,
-                                          out_grid=True, set_spg=221)
+    muon_positions = pointgrid.get_internuclei_positions(crystal_cell, ['F'], 4, spg=62, prec_grid=0.2)
 
     # construct the supercell
-    crystal_supercell = build.make_supercell(crystal_cell, np.diag([3, 3, 2]))
+    crystal_supercell = build.make_supercell(crystal_cell, np.diag([2, 2, 2]))
 
     # set up the calculator
-    pw_calc = Espresso(pseudopotentials=pseudopotentials, tstress=False, tprnfor=True, kpts=(nk, nk, nk),
+    pw_calc = Espresso(pseudopotentials=pseudopotentials, tstress=False, tprnfor=True, kpts=nk,
                        input_data=input_data)
 
     # for each muon site, append this to the crystal, and create the pw.x input file
