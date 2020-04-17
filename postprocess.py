@@ -19,7 +19,8 @@ def main():
     dist_cluster_tol = 0.5 # maximum distance between sites to be part of the same cluster
 
     analysis.QErel(prefix=prefix, postfix=postfix, set_spg=spacegroup, cif_flag=makeCIFs,
-                   muon_multipl_prec=muon_multiplicity_tol, verbose='max', dist_cluster_prec=dist_cluster_tol)
+                   muon_multipl_prec=muon_multiplicity_tol, verbose='max', dist_cluster_prec=dist_cluster_tol,
+                   supercell=[2,2,2])
 
 
 if __name__=='__main__':

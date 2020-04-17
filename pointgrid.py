@@ -241,13 +241,10 @@ def get_internuclei_positions(crystal_cell: Atoms, nn_nuclei: list = None, max_d
                     # this next line, in the ugliest way possible, finds the minimum distance above 0 (0 is
                     min_dist = [min(dist[i][j] for i in range(0, len(dist[:])) for j in range(0, len(dist[:])) if i > j)]
                     if min_dist[0] < prec_grid:
-                        print(i_muon_position)
-                        print(j_muon_position)
                         remove_list.append(j_muon_position)
 
     # now destroy duplicates
     remove_list.sort(reverse=True)
-    print(remove_list)
     for remove_item in remove_list:
         potential_positions.pop(remove_item)
         potential_positions_scaled = np.delete(potential_positions_scaled, remove_item, axis=0)
