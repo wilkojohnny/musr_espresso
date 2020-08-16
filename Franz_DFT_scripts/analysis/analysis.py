@@ -12,13 +12,12 @@ from soprano.analyse.phylogen import Gene, PhylogenCluster
 from utilities import utilities
 
 
-def QErel(prefix, postfix='.out', set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_flag=False, Esort_flag=True,
+def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_flag=False, Esort_flag=True,
           set_ncluster=None, muon_multipl_prec=0.01, dist_cluster_prec=0.1, supercell=None, verbose='min'):
     """A function to analyse a set of Quantum Espresso output files for DFT+mu calculations Frang Lang 03/2018
 
     | Args:
-    |   prefix (str): common prefix to all output files (has to include directory path if files are not in current folder)
-    |   postfix (str): common postfix to all output files
+    |   pwo_files list(str): list of pw.x output files to analyse
     |   NB: all files of the form prefix*postfix will be used
     |   set_spg (str or int): spagegroup of unperturbed material. Can be in H-M notation or as number in Int. Tables. If not set: spglib will be used to determine it.
     |   set_spgsetting (int): setting of spacegroup, if an unconventional setting is needed. If not set it will revert to default value of 1.
@@ -30,14 +29,33 @@ def QErel(prefix, postfix='.out', set_spg=None, set_spgsetting=None, cif_flag=Tr
     |   dist_cluster_prec (float): distance between final muon sites (in Angstrom) below which they are classed as belonging to the same cluster
     |   supercell (list of int): supercell used to calculate the relaxation.
     |   verbose (str: min,max,progbar, default=min): sets in how much detail the program reports on its progress. If no progress is wanted set it to any other string not specified in the list.
+
+    :return list[int] of file_numbers in order of ascending energy, list of [x,y,z] fractional coordinates of muon site in the unit cell
     """
 
     # sort out supercell input - if not given assume 1x1x1 unit cells
     if supercell is None:
         supercell = [1, 1, 1]
 
-    filelist = glob.glob(
-        prefix + '*' + postfix)  # find all files with names prefix*postfix (prefix has to include the directory if the files are not in the current folder)
+    filelist = pwo_files
+    assert len(pwo_files) > 0
+    # get the prefix and postfix automatically
+    prefix = ''
+    postfix = '.' + pwo_files[0].split('.')[-1]
+    if len(pwo_files) > 1:
+        filename0_split = pwo_files[0].split('.')
+        filename1_split = pwo_files[1].split('.')
+        for i_element in range(0, len(filename0_split)):
+            try:
+                if filename0_split[i_element] == filename1_split[i_element]:
+                    prefix = prefix + filename0_split[i_element]
+                else:
+                    break
+            except IndexError:
+                break
+    else:
+        prefix = pwo_files[0].split('.')[1]
+
     N_files = len(filelist)  # number of files found
     if verbose in ['min', 'max']:
         print(str(N_files), ' files found.')
@@ -54,8 +72,9 @@ def QErel(prefix, postfix='.out', set_spg=None, set_spgsetting=None, cif_flag=Tr
 
     # create some arrays to fill later
     # list for column headers of the results summary
-    results_headers = ['Mu_xi', 'Mu_yi', 'Mu_zi', 'Mu_xf', 'Mu_yf', 'Mu_zf', 'E (Ry)', 'dE (Ry)', 'dE (K)', 'NN ion',
-                       'NN dist (A)', 'Multipl', 'Dist cluster', 'Bond order cluster', 'file_name']
+    results_headers = ['Mu_xi', 'Mu_yi', 'Mu_zi', 'Mu_xf', 'Mu_yf', 'Mu_zf', 'Mu_unit_xf', 'Mu_unit_yf', 'Mu_unit_zf',
+                       'E (Ry)', 'dE (Ry)', 'dE (K)', 'NN ion', 'NN dist (A)', 'Multipl', 'Dist cluster',
+                       'Bond order cluster', 'file_name']
     results_detailedheaders = ['Atom', 'x_i', 'y_i', 'z_i', 'x_f', 'y_f', 'z_f', 'Mu-dist.(A)', 'Displ.(A)', 'Cart_x_i',
                                'Cart_y_i', 'Cart_z_i', 'Cart_x_f', 'Cart_y_f', 'Cart_z_f',
                                'Change in dist. to final muon site (A)']
@@ -110,6 +129,9 @@ def QErel(prefix, postfix='.out', set_spg=None, set_spgsetting=None, cif_flag=Tr
         results_detailedpandas[iterator, range(2, N_atoms + 2), 1:4] = np.array(np.round(fractcoords_i, 3),
                                                                                 dtype=str)  # save all initial fractional positions
         results_summary.at[iterator, ['Mu_xf', 'Mu_yf', 'Mu_zf']] = fractcoords_f[-1]  # final fractional muon position
+        # muon location in unit cell:
+        mu_unit_cell = [(fractcoords_f[-1][i] % (1/supercell[i])) * supercell[i] for i in range(0, 3)]
+        results_summary.at[iterator, ['Mu_unit_xf', 'Mu_unit_yf', 'Mu_unit_zf']] = mu_unit_cell # final unit cell muon position
         results_detailedpandas[iterator, range(2, N_atoms + 2), 4:7] = np.array(fractcoords_f,
                                                                                 dtype=str)  # save all final positions
         Mu_nndist = file_f.get_distances(-1, range(0, N_atoms),
@@ -178,14 +200,9 @@ def QErel(prefix, postfix='.out', set_spg=None, set_spgsetting=None, cif_flag=Tr
     muon_multiplicities = np.zeros(N_files)  # empty list for multiplicy of each final muon position
     muon_symbols = [
                        'X'] * N_files  # list of ['X','X',...] with number of elements equal to number of DFT+mu relaxation calculations
-    muon_finalsites = results_summary.loc[:, ['Mu_xf', 'Mu_yf',
-                                              'Mu_zf']].values  # list of fractional coordinates of final relaxed muon sites. as_matrix() is needed for ASE to recognize it as an array.
-    # <JW>: change the muon sits so that they are all in the same unit cell of the supercell by doing (frac_coord % 1/supercellnes) * supercellness
-    muon_finalsites[:, 0] = muon_finalsites[:, 0] % (1 / supercell[0]) * supercell[0]
-    muon_finalsites[:, 1] = muon_finalsites[:, 1] % (1 / supercell[1]) * supercell[1]
-    muon_finalsites[:, 2] = muon_finalsites[:, 2] % (1 / supercell[2]) * supercell[2]
-    cell = np.diag(1/np.array(supercell))*original_latt.get_cell()
-    # </JW> (also changed original_latt.getcell() to cell defined above)
+    muon_finalsites = results_summary.loc[:, ['Mu_unit_xf', 'Mu_unit_yf',
+                                              'Mu_unit_zf']].values  # list of fractional coordinates of final relaxed muon sites. as_matrix() is needed for ASE to recognize it as an array.
+    cell = np.diag(1/np.array(supercell))*original_latt.get_cell() ## JW - do a unit cell instead of supercell
     muon_finalatoms = Atoms(muon_symbols, muon_finalsites,
                             cell=cell)  # create Atoms object with the final relaxed muon sites. This will later be added to a lattice corresponding to one muon site in the original spacegroup
     muon_finalatoms.set_scaled_positions(
@@ -264,6 +281,7 @@ def QErel(prefix, postfix='.out', set_spg=None, set_spgsetting=None, cif_flag=Tr
         write_csv.writerow(results_headers)
         for iterator in range(0, N_files):
             write_csv.writerow(results_summary.values[index_Esorted[iterator][0]])
+
         write_csv.writerow(['Structural information'])
         write_csv.writerow(
             ['A (Ang)', 'B (Ang)', 'C (Ang)', 'alpha', 'beta', 'gamma', 'cell_volume (Ang^3)', 'N_atoms', 'spg H-M'])
@@ -282,3 +300,22 @@ def QErel(prefix, postfix='.out', set_spg=None, set_spgsetting=None, cif_flag=Tr
                 write_csv.writerow(row_iterator)
     if verbose in ['min', 'max']:
         print('... done.')
+
+    file_names = results_summary.loc[:, ['file_name']].values
+    file_names = [file_name[0] for file_name in file_names]
+    file_numbers = []
+    # get only the number part
+    for i_unsorted_file_name in range(0, len(file_names)):
+        i_sorted_file_name = index_Esorted[i_unsorted_file_name][0]
+        file_name = file_names[i_sorted_file_name]
+        file_name = file_name.split('.')
+        file_number = ''
+        for file_name_part in file_name:
+            if file_name_part.isdigit():
+                file_number = int(file_name_part)
+        if file_number == '':
+            file_number = 0
+        file_numbers.append(file_number)
+
+    return file_numbers, muon_finalsites
+

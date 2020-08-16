@@ -27,29 +27,24 @@ muon_mass = 0.1134
 
 def main():
     # define pseudopotential file names
-    # pseudopotentials = {'K': 'K.pbe-spn-rrkjus_psl.1.0.0.UPF',
-    #                     'P': 'P.pbe-nl-rrkjus_psl.1.0.0.UPF',
-    #                     'F': 'F.pbe-n-rrkjus_psl.1.0.0.UPF',
-    #                     'H': 'H.pbe-rrkjus_psl.1.0.0.UPF'}
-    #
-    pseudopotentials = {'Y': 'Y.pbe-spn-rrkjus_psl.1.0.0.UPF',
-                         'F': 'F.pbe-n-rrkjus_psl.1.0.0.UPF',
-                         'H': 'H.pbe-rrkjus_psl.1.0.0.UPF'}
+    pseudopotentials = {'Al': 'Al.pbe-nl-rrkjus_psl.1.0.0.UPF',
+                        'F': 'F.pbe-n-rrkjus_psl.1.0.0.UPF',
+                        'H': 'H.pbe-rrkjus_psl.1.0.0.UPF'}
 
-    nk = (3, 3, 4)  # number of k points
-    prefix = 'YF3.relax.mu'  # prefix for pw.x
+    nk = (4, 4, 4)  # number of k points
+    prefix = 'AlF3.relax.mu'  # prefix for pw.x
     runtime = 24*60*60 - 1  # maximum runtime of pw.x
-    ciffile_location = 'YF3.cif'  # location of .cif structure file
-    output_directory = 'YF3_interF'
-    n_nodes = 3
+    ciffile_location = 'AlF3.cif'  # location of .cif structure file
+    output_directory = 'AlF3'
+    n_nodes = 5
 
     # define additional inputs
     input_data['CONTROL'].update({'prefix': prefix,
                                   'restart_mode': 'from_scratch',
                                   'max_seconds': runtime})
     input_data['SYSTEM'] = {'tot_charge': +1.0,
-                            'ecutwfc': 75.,
-                            'ecutrho': 550.,
+                            'ecutwfc': 80.,
+                            'ecutrho': 800.,
                             'nspin': 1,
                             # 'lda_plus_u': True,
                             # 'Hubbard_U(1)': 3,
@@ -67,10 +62,12 @@ def main():
     crystal_cell = io.read(ciffile_location)
 
     # use pointgrid to find the muon positions
-    muon_positions = pointgrid.get_internuclei_positions(crystal_cell, ['F'], 4, spg=62, prec_grid=0.2)
+    # muon_positions = pointgrid.get_internuclei_positions(crystal_cell, ['F'], 4, spg=221, prec_grid=0.2)
+
+    muon_positions = pointgrid.point_grid(crystal_cell, 5, 5, 5, random=1, rand_factor=10, set_spg=221)
 
     # construct the supercell
-    crystal_supercell = build.make_supercell(crystal_cell, np.diag([2, 2, 2]))
+    crystal_supercell = build.make_supercell(crystal_cell, np.diag([4, 4, 2]))
 
     # set up the calculator
     pw_calc = Espresso(pseudopotentials=pseudopotentials, tstress=False, tprnfor=True, kpts=nk,

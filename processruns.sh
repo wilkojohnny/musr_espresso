@@ -31,7 +31,7 @@ function resubmit {
   # check the run has not already been submitted:
   # get the run number from the run
   slurm_name="$(extract_slurm_name ${pwi_file})"
-  squeue -u mans3765 | grep ${slurm_name} > /dev/null
+  squeue -u $USER | grep ${slurm_name} > /dev/null
 
 
   if [[ $? -eq 1 ]] ; then
@@ -58,7 +58,7 @@ function resubmit {
 
 
 # print out the completed scf runs
-printf "${GREEN}Completed SCF runs:\n"
+printf "${GREEN}Completed DFT runs:\n"
 for pwo_file in *.pwo; do
   # do a grep
   grep -q 'Begin final coordinates' ${pwo_file}
@@ -71,7 +71,7 @@ done
 printf "\n"
 
 # print out incompleted (but not failed) scf runs
-printf "${BLUE}Incomplete SCF runs - may need resubmitting:\n"
+printf "${BLUE}Incomplete DFT runs - may need resubmitting:\n"
 for pwo_file in *.pwo; do
   # do a grep
   grep -q 'Maximum CPU time exceeded' ${pwo_file}
@@ -100,7 +100,7 @@ done
 printf "\n"
 
 # now print out the completely failed runs
-printf "${RED}Failed SCF runs - need looking into:\n"
+printf "${RED}Failed DFT runs - need looking into:\n"
 for pwo_file in *.pwo; do
   # do a grep
   grep -q -e 'convergence NOT achieved after 100 iterations: stopping' -e '%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%' ${pwo_file}
@@ -113,7 +113,7 @@ done
 printf "\n"
 
 # also print runs which haven't even started
-printf "${LRED}Failed SCF runs - didn't even start:\n"
+printf "${LRED}Failed DFT runs - didn't even start:\n"
 grep -L 'iteration #' *.pwo
 
 # put the text colour back to normal

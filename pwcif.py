@@ -15,6 +15,7 @@ def main():
     parser.add_argument('-c', '--cluster', action='store_true', help='Do only one muon from each cluster')
     parser.add_argument('-uc', '--unitcellcif', nargs=1, required=True, type=str,
                         help="CIF file of the original structure to put the final muon sites into")
+    parser.add_argument('-i', '--initial', action='store_true', required=False, help='plot the initial muon sites', )
     parser.add_argument('csv_file', type=str, help='CSV file output of pwprocess.py which has the details of '
                                                               'all the pw.x results')
 
@@ -34,13 +35,15 @@ def main():
     if isinstance(emax, list):
         emax = float(emax[0])
 
+
+    do_initial = arguments.initial
     docluster = arguments.cluster
     pwprocess_output = arguments.csv_file
 
     newcif_location = Path(pwprocess_output).stem + '.cif'
 
     muon_labels, muon_positions = get_unit_cell_muon_positions(pwprocess_output=pwprocess_output, docluster=docluster,
-                                                               emax=emax)
+                                                               emax=emax, do_initial=do_initial)
 
     make_csv(original_cif=unit_cell_cif, new_file_location=newcif_location,  muon_sites=muon_positions,
              muon_labels=muon_labels, sg=sg)
@@ -48,13 +51,15 @@ def main():
     return 0
 
 
-def get_unit_cell_muon_positions(pwprocess_output: str, docluster: bool = False, emax: float = None) -> (list, list):
+def get_unit_cell_muon_positions(pwprocess_output: str, docluster: bool = False, emax: float = None,
+                                 do_initial = False) -> (list, list):
     """
     Get the unit cell muon positions from pwprocess.py's CSV output
     :param pwprocess_output: location of the output file form pwprocess.py
     :param docluster: if True, only do one muon from each dist cluster
     :param emax: maximum difference in energy between each structure and that of minimum energy to get the muon position
                  of (Kelvin).
+    :param do_initial: if True, use the initial muon positions
     :return: (list of muon site labels, list of [x,y,z] fractional muon positions)
     """
 
@@ -94,9 +99,13 @@ def get_unit_cell_muon_positions(pwprocess_output: str, docluster: bool = False,
             # if ignoring clustering, get the label from the file names
             this_label = csv_data['file_name'][i_muonsite].split('.')[filename_label_pos]
         muon_labels.append(this_label)
-        muon_unit_x = csv_data['Mu_unit_xf'][i_muonsite]
-        muon_unit_y = csv_data['Mu_unit_yf'][i_muonsite]
-        muon_unit_z = csv_data['Mu_unit_zf'][i_muonsite]
+        if do_initial:
+            header_suffix = 'i'
+        else:
+            header_suffix = 'f'
+        muon_unit_x = csv_data['Mu_unit_x' + header_suffix][i_muonsite]
+        muon_unit_y = csv_data['Mu_unit_y' + header_suffix][i_muonsite]
+        muon_unit_z = csv_data['Mu_unit_z' + header_suffix][i_muonsite]
         muon_sites.append([muon_unit_x, muon_unit_y, muon_unit_z])
 
     return muon_labels, muon_sites

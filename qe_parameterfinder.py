@@ -15,16 +15,16 @@ import copy  # to create copies of the structure
 
 
 # define pseudopotential file names
-pseudopotentials = { 'Y': 'Y.pbe-spn-rrkjus_psl.1.0.0.UPF',
-                     'F': 'F.pbe-n-rrkjus_psl.1.0.0.UPF'}
+pseudopotentials = { 'Sc': 'Sc.pbe-spn-rrkjus_psl.1.0.0.UPF',
+                     'F': 'F.pbe-n-rrkjus_psl.0.1.UPF'}
 
 
 def main():
 
     input_data = {
         'system': {
-             'ecutwfc': 75,
-             'ecutrho': 600,
+             'ecutwfc': 85,
+             'ecutrho': 500,
              #'lda_plus_u': True,
              #'Hubbard_U(1)': 3,
              # 'occupations': 'smearing',
@@ -32,23 +32,24 @@ def main():
              # 'degauss': 0.01
                 },
         'electrons': {
-            'mixing_beta': 0.7
+            'mixing_beta': 0.7,
+            'mixing_mode': 'plain',
         }
     }
 
-    cif_location = 'YF3.cif'
+    cif_location = 'ScF3.cif'
 
     # get the atoms
     atoms = io.read(cif_location)
     close_atoms = copy.deepcopy(atoms)
     close_atoms.set_cell(atoms.get_cell()*0.95, scale_atoms=True)
 
-    #lattice_parameter_sweep(0.8, 1.2, 0.02, atoms, input_data, 4)
+    #lattice_parameter_sweep(0.8, 1.2, 0.02, atoms, input_data, 3)
 
     all_parameters = []
     dE = []
-    for nk in range(3, 4):
-        parameters = np.arange(700, 850, 50)
+    for nk in range(5, 6):
+        parameters = np.arange(900, 1000, 25)
         parameters, energies = sweep(atoms, input_data, 'system', 'ecutrho', nk, parameters)
         close_atoms_parameters, close_energy = sweep(close_atoms, input_data, 'system', 'ecutrho', nk, parameters)
         all_parameters.append(close_atoms_parameters)
@@ -67,9 +68,9 @@ def main():
 
         dE.append(this_dE)
 
-    gle_utils.plot_xy(all_parameters, dE, 'ecutrho and scf energy, YF\\textsubscript{3}', legend="nk=3")#["nk=" + str(i) for i in range(2, 7)])
+    gle_utils.plot_xy(all_parameters, dE, 'ecutwfc and scf energy, NaF', legend=["nk=" + str(i) for i in range(2, 7)])
 
-    return 1
+    return 0
 
 
 # sweep up the lattice parameters, and plot a graph
