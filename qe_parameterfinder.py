@@ -12,21 +12,28 @@ from ase.calculators.espresso import Espresso  # to do espresso calculations
 import gle_utils  # for plotting with GLE
 import numpy as np  # so we can do arange (i.e same as range() but with floats)
 import copy  # to create copies of the structure
+import argparse
 
 
 # define pseudopotential file names
-pseudopotentials = { 'C': 'C.pbe-n-rrkjus_psl.1.0.0.UPF',
-                     'H': 'H.pbe-rrkjus_psl.1.0.0.UPF',
+pseudopotentials = { 'Na': 'Na.pbe-spnl-rrkjus_psl.1.0.0.UPF',
+                     'P': 'P.pbe-nl-rrkjus_psl.1.0.0.UPF',
                      'O': 'O.pbe-n-rrkjus_psl.1.0.0.UPF',
                      'F': 'F.pbe-n-rrkjus_psl.0.1.UPF'}
 
 
 def main():
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n", "--ncores", help="number of cores to run the calculation on", type=int, default=1)
+    args = parser.parse_args()
+
+    ncores = args.ncores
+
     input_data = {
         'system': {
-             'ecutwfc': 85,
-             'ecutrho': 750,
+             'ecutwfc': 60,
+             'ecutrho': 700,
              #'lda_plus_u': True,
              #'Hubbard_U(1)': 3,
              # 'occupations': 'smearing',
@@ -35,25 +42,24 @@ def main():
                 },
         'electrons': {
             'mixing_beta': 0.7,
-            'mixing_mode': 'plain',
         }
     }
 
-    cif_location = 'PERFECTA.cif'
+    cif_location = '~/Documents/University/Na2PO3F/Na2PO3F.cif'
 
     # get the atoms
     atoms = io.read(cif_location)
     close_atoms = copy.deepcopy(atoms)
     close_atoms.set_cell(atoms.get_cell()*0.95, scale_atoms=True)
 
-    #lattice_parameter_sweep(0.8, 1.2, 0.02, atoms, input_data, 3)
+    #lattice_parameter_sweep(0.8, 1.2, 0.02, atoms, input_data, 3, no_cores=ncores)
 
     all_parameters = []
     dE = []
-    for nk in range(2, 6):
-        parameters = np.arange(40, 75, 5)
-        parameters, energies = sweep(atoms, input_data, 'system', 'ecutwfc', nk, parameters)
-        close_atoms_parameters, close_energy = sweep(close_atoms, input_data, 'system', 'ecutwfc', nk, parameters)
+    for nk in range(1, 6):
+        parameters = np.arange(50, 80, 5)
+        parameters, energies = sweep(atoms, input_data, 'system', 'ecutwfc', nk, parameters, no_cores=ncores)
+        close_atoms_parameters, close_energy = sweep(close_atoms, input_data, 'system', 'ecutwfc', nk, parameters, no_cores=ncores)
         all_parameters.append(close_atoms_parameters)
 
         this_dE = []
@@ -80,7 +86,7 @@ def main():
 # postamble of "! plot the experimental lattice parameter \n "
 #             + "set color red \n amove xg(4.62) yg(ygmin) \n aline xg(4.62) yg(ygmax)"
 # is a nice way to plot the experimental value of the lattice parameter
-def lattice_parameter_sweep(scale_min, scale_max, scale_step, atoms, input_data, nk, postamble='', plot=True):
+def lattice_parameter_sweep(scale_min, scale_max, scale_step, atoms, input_data, nk, postamble='', plot=True, no_cores=1):
     a = []
     e = []
 
@@ -95,7 +101,7 @@ def lattice_parameter_sweep(scale_min, scale_max, scale_step, atoms, input_data,
         # alter
         current_atoms.set_cell(scale*original_cell, scale_atoms=True)
 
-        energy = get_energy(atoms=current_atoms, nk=nk, input_data=input_data)/13.6056980659  # gets converted into Ry
+        energy = get_energy(atoms=current_atoms, nk=nk, input_data=input_data, no_cores=no_cores)/13.6056980659  # gets converted into Ry
 
         a.append(scale)
         e.append(energy)
@@ -112,7 +118,7 @@ def lattice_parameter_sweep(scale_min, scale_max, scale_step, atoms, input_data,
     return a, e
 
 
-def sweep(atoms, input_data, sweep_namespace, sweep_parameter, nk, parameters):
+def sweep(atoms, input_data, sweep_namespace, sweep_parameter, nk, parameters, no_cores=1):
     successful_parameters = []
     e = []
 
@@ -127,7 +133,7 @@ def sweep(atoms, input_data, sweep_namespace, sweep_parameter, nk, parameters):
             input_data[sweep_namespace] = {sweep_parameter: parameter_value}
 
         # calculate the energy and add to the corresponding array
-        energy = get_energy(atoms, nk, input_data)
+        energy = get_energy(atoms, nk, input_data, no_cores=no_cores)
 
         # if energy is not none (i.e the QE run converged)
         if energy is not None:
@@ -143,14 +149,19 @@ def sweep(atoms, input_data, sweep_namespace, sweep_parameter, nk, parameters):
     return successful_parameters, e
 
 
-def get_energy(atoms: bulk, nk=3, input_data=None):
+def get_energy(atoms: bulk, nk=3, input_data=None, no_cores=1):
     # fix mutable arguments
     if input_data is None:
         input_data = {}
 
     # set up the calculator
     calc = Espresso(pseudopotentials=pseudopotentials,
-                    tstress=False, tprnfor=False, kpts=(nk, nk, nk), input_data=input_data)
+                    tstress=False, tprnfor=False, kpts=(nk+2, nk+2, nk), input_data=input_data)
+
+    if no_cores>1:
+        # if no_cores>1, then run pw.x in paralell using MPIRUN
+        calc.command = 'mpirun -n 4 pw.x -in PREFIX.pwi > PREFIX.pwo'
+
     # attach the calculator to the atoms
     atoms.set_calculator(calc)
 
