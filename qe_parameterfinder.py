@@ -31,6 +31,10 @@ def main():
     ncores = args.ncores
 
     input_data = {
+        'control': {
+             'pseudo_dir': 'pp',
+             'outdir': 'out'
+        },
         'system': {
              'ecutwfc': 60,
              'ecutrho': 700,
@@ -45,7 +49,7 @@ def main():
         }
     }
 
-    cif_location = '~/Documents/University/Na2PO3F/Na2PO3F.cif'
+    cif_location = 'Na2PO3F.cif'
 
     # get the atoms
     atoms = io.read(cif_location)
@@ -160,7 +164,7 @@ def get_energy(atoms: bulk, nk=3, input_data=None, no_cores=1):
 
     if no_cores>1:
         # if no_cores>1, then run pw.x in paralell using MPIRUN
-        calc.command = 'mpirun -n 4 pw.x -in PREFIX.pwi > PREFIX.pwo'
+        calc.command = 'mpirun -n ' + str(no_cores) + ' pw.x -in PREFIX.pwi > PREFIX.pwo'
 
     # attach the calculator to the atoms
     atoms.set_calculator(calc)
