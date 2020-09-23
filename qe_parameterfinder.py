@@ -6,6 +6,9 @@
 # sweep(..): sweep up any other parameter in the pw.x input file, outputting parameter and energy
 # get_energy(..): calculate the total energy using pw.x
 
+import functools
+print = functools.partial(print, flush=True)
+
 from ase.build import bulk  # to set up the cells
 from ase import io, calculators  # to get the structures from CIF files, and for error handling
 from ase.calculators.espresso import Espresso  # to do espresso calculations
@@ -31,10 +34,10 @@ def main():
     ncores = args.ncores
 
     input_data = {
-        'control': {
-             'pseudo_dir': 'pp',
-             'outdir': 'out'
-        },
+        # 'control': {
+        #      'pseudo_dir': 'pp',
+        #      'outdir': 'out'
+        # },
         'system': {
              'ecutwfc': 60,
              'ecutrho': 700,
@@ -49,7 +52,7 @@ def main():
         }
     }
 
-    cif_location = 'Na2PO3F.cif'
+    cif_location = 'NaF.cif'
 
     # get the atoms
     atoms = io.read(cif_location)
@@ -79,6 +82,8 @@ def main():
             this_dE.append(energy_change)
 
         dE.append(this_dE)
+        print('nk=' + str(nk))
+        print(dE)
 
     gle_utils.plot_xy(all_parameters, dE, 'ecutwfc and scf energy, PERFECTA', legend=["nk=" + str(i) for i in range(2, 6)])
 
