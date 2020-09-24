@@ -162,11 +162,15 @@ def write_slurm(pw_file_name: str, directory='', runtime_s: int = 43200, n_nodes
         # otherwise just do as its told
         slurm_file.write('#SBATCH --time=' + time.strftime("%H:%M:%S", time.gmtime(runtime_s)) + '\n')
     slurm_file.write('#SBATCH --nodes=' + str(n_nodes) + '\n')  # number of nodes
+    slurm_file.write('#SBATCH --ntasks-per-node=16\n')  # number of cores per node
     slurm_file.write('#======================================================================\n\n')  # end of parameters
 
     # do modules
     slurm_file.write('module purge\nmodule load intel-compilers/2016\nmodule load intel-mkl/2016\n')
     slurm_file.write('module load mvapich2/2.1.0__intel-2016\nmodule load espresso/6.0.0\n\n')
+
+    # init slurm environment variables
+    slurm_file.write('. enable_arcus-b_mpi.sh\n')
 
     # move to the data directory
     slurm_file.write('cd $DATA/' + directory + '\n')

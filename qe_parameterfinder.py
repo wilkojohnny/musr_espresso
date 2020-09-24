@@ -28,10 +28,12 @@ pseudopotentials = { 'Na': 'Na.pbe-spnl-rrkjus_psl.1.0.0.UPF',
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-n", "--ncores", help="number of cores to run the calculation on", type=int, default=1)
+    parser.add_argument("-np", "--ncores", help="number of cores to run the calculation on", type=int, default=1)
+    parser.add_argument("-hosts", "--mpihosts", help="MPI hosts", type=str, default="")
     args = parser.parse_args()
 
     ncores = args.ncores
+    mpi_hosts = args.mpihosts
 
     input_data = {
         # 'control': {
@@ -65,8 +67,8 @@ def main():
     dE = []
     for nk in range(1, 6):
         parameters = np.arange(50, 80, 5)
-        parameters, energies = sweep(atoms, input_data, 'system', 'ecutwfc', nk, parameters, no_cores=ncores)
-        close_atoms_parameters, close_energy = sweep(close_atoms, input_data, 'system', 'ecutwfc', nk, parameters, no_cores=ncores)
+        parameters, energies = sweep(atoms, input_data, 'system', 'ecutwfc', nk, parameters, no_cores=ncores, mpi_hosts=mpi_hosts)
+        close_atoms_parameters, close_energy = sweep(close_atoms, input_data, 'system', 'ecutwfc', nk, parameters, no_cores=ncores, mpi_hosts=mpi_hosts)
         all_parameters.append(close_atoms_parameters)
 
         this_dE = []
@@ -95,7 +97,8 @@ def main():
 # postamble of "! plot the experimental lattice parameter \n "
 #             + "set color red \n amove xg(4.62) yg(ygmin) \n aline xg(4.62) yg(ygmax)"
 # is a nice way to plot the experimental value of the lattice parameter
-def lattice_parameter_sweep(scale_min, scale_max, scale_step, atoms, input_data, nk, postamble='', plot=True, no_cores=1):
+def lattice_parameter_sweep(scale_min, scale_max, scale_step, atoms, input_data, nk, postamble='', plot=True, no_cores=1,
+                            mpi_hosts=""):
     a = []
     e = []
 
@@ -110,7 +113,8 @@ def lattice_parameter_sweep(scale_min, scale_max, scale_step, atoms, input_data,
         # alter
         current_atoms.set_cell(scale*original_cell, scale_atoms=True)
 
-        energy = get_energy(atoms=current_atoms, nk=nk, input_data=input_data, no_cores=no_cores)/13.6056980659  # gets converted into Ry
+        energy = get_energy(atoms=current_atoms, nk=nk, input_data=input_data, no_cores=no_cores,
+                            mpi_hosts=mpi_hosts)/13.6056980659  # gets converted into Ry
 
         a.append(scale)
         e.append(energy)
@@ -127,7 +131,7 @@ def lattice_parameter_sweep(scale_min, scale_max, scale_step, atoms, input_data,
     return a, e
 
 
-def sweep(atoms, input_data, sweep_namespace, sweep_parameter, nk, parameters, no_cores=1):
+def sweep(atoms, input_data, sweep_namespace, sweep_parameter, nk, parameters, no_cores=1, mpi_hosts=""):
     successful_parameters = []
     e = []
 
@@ -142,7 +146,7 @@ def sweep(atoms, input_data, sweep_namespace, sweep_parameter, nk, parameters, n
             input_data[sweep_namespace] = {sweep_parameter: parameter_value}
 
         # calculate the energy and add to the corresponding array
-        energy = get_energy(atoms, nk, input_data, no_cores=no_cores)
+        energy = get_energy(atoms, nk, input_data, no_cores=no_cores, mpi_hosts="")
 
         # if energy is not none (i.e the QE run converged)
         if energy is not None:
@@ -158,7 +162,7 @@ def sweep(atoms, input_data, sweep_namespace, sweep_parameter, nk, parameters, n
     return successful_parameters, e
 
 
-def get_energy(atoms: bulk, nk=3, input_data=None, no_cores=1):
+def get_energy(atoms: bulk, nk=3, input_data=None, no_cores=1, mpi_hosts=""):
     # fix mutable arguments
     if input_data is None:
         input_data = {}
@@ -169,7 +173,10 @@ def get_energy(atoms: bulk, nk=3, input_data=None, no_cores=1):
 
     if no_cores>1:
         # if no_cores>1, then run pw.x in paralell using MPIRUN
-        calc.command = 'mpirun -n ' + str(no_cores) + ' pw.x -in PREFIX.pwi > PREFIX.pwo'
+        mpi_args = '-np ' + str(no_cores)
+        if mpi_hosts!= '':
+            mpi_args += '-hosts ' + mpi_hosts
+        calc.command = 'mpirun ' + mpi_args + ' pw.x -in PREFIX.pwi > PREFIX.pwo'
 
     # attach the calculator to the atoms
     atoms.set_calculator(calc)
