@@ -36,13 +36,13 @@ def main():
     mpi_hosts = args.mpihosts
 
     input_data = {
-        # 'control': {
-        #      'pseudo_dir': 'pp',
-        #      'outdir': 'out'
-        # },
+         'control': {
+              'pseudo_dir': 'pp',
+              'outdir': 'out'
+         },
         'system': {
-             'ecutwfc': 60,
-             'ecutrho': 700,
+             'ecutwfc': 85,
+             'ecutrho': 900,
              #'lda_plus_u': True,
              #'Hubbard_U(1)': 3,
              # 'occupations': 'smearing',
@@ -54,21 +54,21 @@ def main():
         }
     }
 
-    cif_location = 'NaF.cif'
+    cif_location = 'Na2PO3F.cif'
 
     # get the atoms
     atoms = io.read(cif_location)
     close_atoms = copy.deepcopy(atoms)
     close_atoms.set_cell(atoms.get_cell()*0.95, scale_atoms=True)
 
-    #lattice_parameter_sweep(0.8, 1.2, 0.02, atoms, input_data, 3, no_cores=ncores)
+    lattice_parameter_sweep(1.04, 1.2, 0.02, atoms, input_data, 3, no_cores=ncores, mpi_hosts=mpi_hosts)
 
     all_parameters = []
     dE = []
-    for nk in range(1, 6):
-        parameters = np.arange(50, 80, 5)
-        parameters, energies = sweep(atoms, input_data, 'system', 'ecutwfc', nk, parameters, no_cores=ncores, mpi_hosts=mpi_hosts)
-        close_atoms_parameters, close_energy = sweep(close_atoms, input_data, 'system', 'ecutwfc', nk, parameters, no_cores=ncores, mpi_hosts=mpi_hosts)
+    for nk in range(3, 4):
+        parameters = np.arange(350, 1000, 50)
+        parameters, energies = sweep(atoms, input_data, 'system', 'ecutrho', nk, parameters, no_cores=ncores, mpi_hosts=mpi_hosts)
+        close_atoms_parameters, close_energy = sweep(close_atoms, input_data, 'system', 'ecutrho', nk, parameters, no_cores=ncores, mpi_hosts=mpi_hosts)
         all_parameters.append(close_atoms_parameters)
 
         this_dE = []
@@ -87,7 +87,7 @@ def main():
         print('nk=' + str(nk))
         print(dE)
 
-    gle_utils.plot_xy(all_parameters, dE, 'ecutwfc and scf energy, PERFECTA', legend=["nk=" + str(i) for i in range(2, 6)])
+    gle_utils.plot_xy(all_parameters, dE, 'ecutwfc and scf energy, Na2PO3F', legend="nk=553")#["nk=" + str(i) for i in range(2, 6)])
 
     return 0
 
@@ -101,7 +101,7 @@ def lattice_parameter_sweep(scale_min, scale_max, scale_step, atoms, input_data,
                             mpi_hosts=""):
     a = []
     e = []
-
+    
     original_cell = atoms.get_cell()
 
     current_atoms = copy.deepcopy(atoms)
@@ -169,15 +169,15 @@ def get_energy(atoms: bulk, nk=3, input_data=None, no_cores=1, mpi_hosts=""):
 
     # set up the calculator
     calc = Espresso(pseudopotentials=pseudopotentials,
-                    tstress=False, tprnfor=False, kpts=(nk+2, nk+2, nk), input_data=input_data)
+                    tstress=False, tprnfor=False, kpts=(nk, nk, nk), input_data=input_data)
 
     if no_cores>1:
         # if no_cores>1, then run pw.x in paralell using MPIRUN
         mpi_args = '-np ' + str(no_cores)
         if mpi_hosts!= '':
-            mpi_args += '-hosts ' + mpi_hosts
+            mpi_args += ' -hosts ' + mpi_hosts
         calc.command = 'mpirun ' + mpi_args + ' pw.x -in PREFIX.pwi > PREFIX.pwo'
-
+    
     # attach the calculator to the atoms
     atoms.set_calculator(calc)
 
