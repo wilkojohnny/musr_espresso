@@ -1,0 +1,17 @@
+! Draw a graph of lattice parameter vs energy
+
+size 9 9.5                             !Sets the size of the paper
+rmove 0.3 0
+begin graph
+        size 9.5 10
+        data "a_plot.dat" d1=c1,c2
+        title "Lattice parameter with DFT" hei 0.5 color black
+        xtitle "a / Angstroms"
+        ytitle "DFT Total Energy /eV"
+	d1 marker fcircle msize 0.11 color black
+end graph
+
+! plot the experimental lattice parameter
+set color red
+amove xg(4.62) yg(ygmin)
+aline xg(4.62) yg(ygmax)

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#======================================================================
+#SBATCH --partition=compute
+#SBATCH --constraint=haswell
+#SBATCH --ntasks-per-node=16
+#SBATCH --job-name=NaF_param
+#SBATCH --time=02:00:00
+#SBATCH --nodes=3
+#======================================================================
+
+module purge
+module load intel-compilers/2016
+module load intel-mkl/2016
+module load mvapich2/2.1.0__intel-2016
+module load espresso/6.0.0
+module load python/anaconda3/2019.03
+
+source activate $DATA/musr-espresso/env
+
+. enable_arcus-b_mpi.sh
+
+cd $DATA/NaF/
+
+python3 ./NaF_ecutwfc.py $MPI_HOSTS
