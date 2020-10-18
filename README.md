@@ -1,0 +1,55 @@
+# musr-espresso
+Quantum Espresso Tools for DFT+mu
+
+## musr-espresso python package
+The musr-espresso python package can run DFT calculations to calculate appropriate cutoff parameters, calculate the dependence of the lattice parameter 
+on the energy, and set up a DFT+mu calculation, ready for sumbission on Oxford's ARC system.
+
+To install, move to this folder on your system and run
+```bash
+pip install ./
+```
+That's it! All examples should now work!
+
+
+### pwprocess.sh
+This is a BASH script that is designed to run on the ARC, which monitors the progress of current runs, resumbits those which have run out of time, and reports the 
+runs that have failed. To use this, add it to a folder on the ARC system (also adding that folder to PATH), cd to the folder where the espresso runs are stored, 
+and run
+```bash
+pwprocess.sh
+```
+
+### PostProcessing
+The folder postprocessing/ contains a few tools for the command line, which analyse the results of a completed DFT+mu calculation. 
+Each of these have a help function, e.g running
+```bash
+pwcif.py --help
+```
+returns
+```
+usage: pwcif.py [-h] [-sg SPACEGROUP] [-em EMAX] [-c] -uc UNITCELLCIF [-i]
+                csv_file
+
+pw.x output file processor to find the muon site
+
+positional arguments:
+  csv_file              CSV file output of pwprocess.py which has the details
+                        of all the pw.x results
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -sg SPACEGROUP, --spacegroup SPACEGROUP
+  -em EMAX, --emax EMAX
+                        Maximum energy difference (in Kelvin) from the
+                        smallest run to put in CSV file
+  -c, --cluster         Do only one muon from each cluster
+  -uc UNITCELLCIF, --unitcellcif UNITCELLCIF
+                        CIF file of the original structure to put the final
+                        muon sites into
+  -i, --initial         plot the initial muon sites
+```
+
+### old
+This folder contains the old scripts, most of which have since morphed into this package. These contain a lot of spaghetti, broken dependencies, bad practices 
+etc so use at your own risk!
