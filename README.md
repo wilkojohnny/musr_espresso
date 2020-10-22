@@ -11,8 +11,29 @@ pip install ./
 ```
 That's it! All examples should now work!
 
+### setting up musr-espresso on ARC
+To use musr-espresso on ARC, you first have to create a virtual python environment. Run the following commands:
+```bash
+module load python/anaconda3/2019.03
+export CONPREFIX=$DATA/espresso_env
+conda create --prefix $CONPREFIX --copy python=3.5
+source activate $CONPREFIX
+conda install pip
+cd [musr-espresso package location]
+python -m pip install ./
+```
+(This creates the python environment, and installs musr-espresso. This only needs to be done once.
 
-### pwprocess.sh
+Then, to use the musr-espresso scripts, make sure your slurm script has the lines
+```bash
+module load python/anaconda3/2019.03
+export CONPREFIX=$DATA/espresso_env
+source activate $CONPREFIX
+```
+
+You will need to change the example SLURM script to match the conda environment created above for it to work.
+
+## pwprocess.sh
 This is a BASH script that is designed to run on the ARC, which monitors the progress of current runs, resumbits those which have run out of time, and reports the 
 runs that have failed. To use this, add it to a folder on the ARC system (also adding that folder to PATH), cd to the folder where the espresso runs are stored, 
 and run
@@ -20,7 +41,7 @@ and run
 pwprocess.sh
 ```
 
-### PostProcessing
+## PostProcessing
 The folder postprocessing/ contains a few tools for the command line, which analyse the results of a completed DFT+mu calculation. 
 Each of these have a help function, e.g running
 ```bash
@@ -50,6 +71,6 @@ optional arguments:
   -i, --initial         plot the initial muon sites
 ```
 
-### old
+## old
 This folder contains the old scripts, most of which have since morphed into this package. These contain a lot of spaghetti, broken dependencies, bad practices 
 etc so use at your own risk!
