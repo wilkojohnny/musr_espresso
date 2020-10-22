@@ -9,7 +9,8 @@ NaF_atoms = musr_espresso.io.read('NaF.cif')
 
 # give the pseudopotential file names
 pseudopotentials = { 'Na': 'Na.pbe-spnl-rrkjus_psl.1.0.0.UPF',
-                     'F': 'F.pbe-n-rrkjus_psl.0.1.UPF'}
+                     'F': 'F.pbe-n-rrkjus_psl.0.1.UPF',
+                     'H': 'H.pbe-rrkjus_psl.1.0.0.UPF'}
 
 # give the pw.x parameters
 input_data = {
@@ -20,6 +21,11 @@ input_data = {
     'system': {
         'ecutwfc': 85,
         'ecutrho': 900,
+        'tot_charge': +1,
+        'nspin': 1,
+    },
+    'ions': {
+        'ion_dynamics': 'bfgs',
     },
     'electrons': {
         'mixing_beta': 0.7,

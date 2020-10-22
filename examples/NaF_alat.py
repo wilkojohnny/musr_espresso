@@ -30,7 +30,7 @@ input_data = {
 pw = musr_espresso.PW(pwi_params=input_data, atoms=NaF_atoms, pseudopotentials=pseudopotentials, nk=(3,3,3))
 
 # scan up ecutwfc and nk
-alat_energy = pw.sweep_lattice_parameter(start_scale=0.7, end_scale=1.2, scale_step=0.05)
+alat_energy = pw.sweep_lattice_parameter(start_scale=0.7, end_scale=1.2, scale_step=0.05, plot=True)
 
 # print the result
 print(alat_energy)
