@@ -6,8 +6,8 @@ marker = ["wcircle", "wtriangle", "wsquare", "wdiamond", "odot", "cross", "flowe
 
 
 # plot simple x y data
-def plot_xy(xdata, ydata, title='xy data', xrange=None, yrange=None, size=None, postamble="", legend=None,
-            colors=None):
+def plot_xy(xdata, ydata, title='xy data', xtitle="xtitle", ytitle="ytitle", xrange=None, yrange=None, size=None,
+            postamble="", legend=None, colors=None):
     # fix mutable and null arguments
     if size is None:
         size = [10, 10]
@@ -73,7 +73,7 @@ def plot_xy(xdata, ydata, title='xy data', xrange=None, yrange=None, size=None, 
 
     gle_file.write("\t data \"plot.dat\" " + data_line + " \n")
     gle_file.writelines(linestyle_lines)
-    gle_file.write("\t title \"" + title + "\" \n\t xtitle \"xtitle\" \n\t ytitle \"ytitle\" \n")
+    gle_file.write("\t title \"" + title + "\" \n\t xtitle \"" + xtitle + "\" \n\t ytitle \"" + ytitle + "\" \n")
 
     # axis limits
     if xrange is not None:

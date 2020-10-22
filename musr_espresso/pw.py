@@ -64,16 +64,17 @@ class PW(object):
         if plot:
             plot_xy(a, e, title="DFT total energy vs Lattice scale", legend="DFT Energy /Ry",
                     postamble="! plot the experimental lattice parameter \n "
-                               + "set color red \n amove xg(1) yg(ygmin) \n aline xg(1) yg(ygmax)")
+                               + "set color red \n amove xg(1) yg(ygmin) \n aline xg(1) yg(ygmax)",
+                    xtitle="lattice scale factor", ytitle="DFT Energy (Ry)")
         return [a, e]
 
-    def sweep_parameter(self, pwi_namespace, pwi_parameter, pwi_param_values, nk, small_sf=0.95, plot=False):
+    def sweep_parameter(self, pwi_namespace, pwi_parameter, pwi_param_values, nk=None, small_sf=0.95, plot=False):
         """
         Sweep a parameter in the pwi file, calculating E(a)-E(small_sf*a) for each
         :param pwi_namespace: namespace the parameter to change is in
         :param pwi_parameter: parameter to change
         :param pwi_param_values: array of values to try
-        :param nk: array of nks to try
+        :param nk: array of nks to try (if None, just uses the class's saved nk (i.e self.nk))
         :param small_sf: scale factor to apply to the cell for the small cell energy calculation
         :param plot: do plot of results
         :return: list with entries [nk_id][param][dE]
@@ -88,9 +89,13 @@ class PW(object):
             if plot:
                 all_parameters = [res[0] for res in result]
                 dE = [res[1] for res in result]
-                plot_xy(all_parameters, dE, pwi_parameter + 'and scf energy,' + str(self.atoms.symbols),
-                        legend=["nk=" + str(i) for i in nk])
+                plot_xy(all_parameters, dE, pwi_parameter + ' and scf energy,' + str(self.atoms.symbols),
+                        legend=["nk=" + str(i) for i in nk], ytitle="E(a)-E({:.3f}a) (Ry)".format(small_sf),
+                        xtitle=pwi_parameter)
             return result
+        elif nk is None:
+            # nk's default is self.nk
+            nk = self.nk
         else:
             # if nk is just one integer, assume the user wants a k-grid of (nk, nk, nk)
             if isinstance(nk, int):
@@ -125,8 +130,9 @@ class PW(object):
             print(this_dE)
 
             if plot:
-                plot_xy(close_atoms_parameters, this_dE, pwi_parameter + 'and scf energy,' +
-                        str(self.atoms.symbols), legend="k-grid=" + str(nk))
+                plot_xy(close_atoms_parameters, this_dE, pwi_parameter + ' and scf energy,' +
+                        str(self.atoms.symbols), legend="k-grid=" + str(nk),
+                        ytitle="E(a)-E({:.3f}a) (Ry)".format(small_sf), xtitle=pwi_parameter)
 
             return [close_atoms_parameters, this_dE]
 
@@ -237,9 +243,9 @@ class PW(object):
             """
             Writes SLURM files to submit to the cluster
             :param pw_file_name: location of the pw.x file to run (if it doesn't have a .pwi extension it gets added)
-            :param directiry: directory on the cluster to save (and run) everything on
+            :param directory: directory on the cluster to save (and run) everything on
             :param runtime_s: runtime of the SLURM job, in seconds
-            :param n_cores: number of cores to run the script on
+            :param n_nodes: number of cores to run the script on
             :param devel: run on the development cores (for testing). If True it forces the runtime to be 600s.
             :param priority: run with priority quality of service on ARC
             :return: location of the SLURM file written
