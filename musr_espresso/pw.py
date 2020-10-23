@@ -323,6 +323,14 @@ class PW(object):
         if self.pwi_params['control']['outdir'][0:8] != '/scratch':
             print('Hint: If running on ARC, it is better to use the /scratch area for the pw.x outdir.')
 
+        # if 'relax' calcuation not specified, then warn
+        try:
+            if self.pwi_params['control']['calculation'] != 'relax':
+                print('WARNING: Type of calculation is not set to relax. This is not normal DFT+mu!')
+        except KeyError:
+            print('You did not set the calculation type. No worries -- I\'m setting it to \'relax\' for you.')
+            self.pwi_params['control'] = {'calculation': 'relax'}
+
         # set up the calculator
         pw_calc = espresso.Espresso(pseudopotentials=self.pseudopotentials, tstress=False, tprnfor=True, kpts=self.nk,
                                     input_data=self.pwi_params)
