@@ -316,6 +316,13 @@ class PW(object):
 
         supercell_atoms = build.make_supercell(self.atoms, supercell)
 
+        if show_positions:
+            all_muons_supercell = build.make_supercell(self.atoms, supercell)
+
+        # give a hint about using the /scratch/ area for the output directory
+        if self.pwi_params['control']['outdir'][0:8] != '/scratch':
+            print('Hint: If running on ARC, it is better to use the /scratch area for the pw.x outdir.')
+
         # set up the calculator
         pw_calc = espresso.Espresso(pseudopotentials=self.pseudopotentials, tstress=False, tprnfor=True, kpts=self.nk,
                                     input_data=self.pwi_params)
@@ -354,8 +361,9 @@ class PW(object):
             # remove the muon from the supercell for the next iteration
             del supercell_atoms[-1]
 
-            # add the muon onto the single cell, so that it can be viewed
-            supercell_atoms.append(muon)
+            # add the muon onto the visual cell, so that it can be viewed
+            if show_positions:
+                all_muons_supercell.append(muon)
 
         # write the runall bash script to run on the cluster
 
@@ -376,6 +384,6 @@ class PW(object):
                 script_file.write('sbatch ' + slurm_file_name + '\n')
 
         if show_positions:
-            view(supercell_atoms)
+            view(all_muons_supercell)
 
         return pwi_files
