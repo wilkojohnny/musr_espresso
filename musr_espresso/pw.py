@@ -286,7 +286,7 @@ class PW(object):
                 slurm_file.write('#SBATCH --time=00:10:00\n')
             else:
                 # otherwise just do as its told
-                slurm_file.write('#SBATCH --time={:02d}'.format(int(np.floor(runtime_s/(60*60*24))))
+                slurm_file.write('#SBATCH --time={:02d}'.format(int(np.floor(runtime_s/(60*60))))
                                  + time.strftime(":%M:%S", time.gmtime(runtime_s)) + '\n')
             slurm_file.write('#SBATCH --nodes=' + str(n_nodes) + '\n')  # number of nodes
             slurm_file.write('#SBATCH --ntasks-per-node=16\n')  # number of cores per node
