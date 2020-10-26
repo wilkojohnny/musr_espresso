@@ -329,7 +329,14 @@ class PW(object):
                 print('WARNING: Type of calculation is not set to relax. This is not normal DFT+mu!')
         except KeyError:
             print('You did not set the calculation type. No worries -- I\'m setting it to \'relax\' for you.')
-            self.pwi_params['control'] = {'calculation': 'relax'}
+            self.pwi_params['control'].update({'calculation': 'relax'})
+
+        # write in the time limit
+        self.pwi_params['control'].update({'max_seconds': run_time})
+        try:
+            self.pwi_params['control']['restart_mode'] = 'from_scratch'
+        except KeyError:
+            self.pwi_params['control'].update({'restart_mode': 'from_scratch'})
 
         # set up the calculator
         pw_calc = espresso.Espresso(pseudopotentials=self.pseudopotentials, tstress=False, tprnfor=True, kpts=self.nk,
