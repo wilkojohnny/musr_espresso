@@ -30,7 +30,7 @@ input_data = {
 pw = musr_espresso.PW(pwi_params=input_data, atoms=NaF_atoms, pseudopotentials=pseudopotentials, nk=(3,3,3))
 
 # scan up ecutwfc and nk
-param_energies = pw.sweep_parameter('system', 'ecutwfc', [50,60,70,80], nk=[2,3,4], plot=True)
+param_energies = pw.sweep_parameter('system', 'ecutrho', [500, 600], nk=(2,2,2), plot=True)
 
 # print the result
 print(param_energies)

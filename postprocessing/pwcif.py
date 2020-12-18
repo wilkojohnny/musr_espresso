@@ -1,4 +1,4 @@
-#!/usr/local/bin/python3.7
+#!/opt/anaconda3/envs/qe_env/bin/python3
 import argparse
 import pandas as pd
 from pathlib import Path

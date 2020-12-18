@@ -33,13 +33,19 @@ source activate $CONPREFIX
 
 You will need to change the example SLURM script to match the conda environment created above for it to work.
 
-## pwprocess.sh
-This is a BASH script that is designed to run on the ARC, which monitors the progress of current runs, resumbits those which have run out of time, and reports the 
-runs that have failed. To use this, add it to a folder on the ARC system (also adding that folder to PATH), cd to the folder where the espresso runs are stored, 
+## pwprocess.sh and cancelruns.sh
+These are BASH scripts that is designed to run on the ARC, which monitors the progress of current runs, resumbits those which have run out of time, and reports the 
+runs that have failed, and provides an interactive interface to cancel the runs already on the system. To use these, add them to a folder on the ARC system (also adding that folder to PATH), cd to the folder where the espresso runs are stored, 
 and run
 ```bash
 pwprocess.sh
 ```
+(I would recommend editing ./.bash_profile and adding the following lines:
+```bash
+alias processruns="$HOME/processruns.sh"
+alias cancelruns="$HOME/cancelruns.sh"
+```
+Then you can use the commands processruns and cancelruns from anywhere!
 
 ## PostProcessing
 The folder postprocessing/ contains a few tools for the command line, which analyse the results of a completed DFT+mu calculation. 
