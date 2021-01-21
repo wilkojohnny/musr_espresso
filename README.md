@@ -16,7 +16,7 @@ To use musr-espresso on ARC, you first have to create a virtual python environme
 ```bash
 module load python/anaconda3/2019.03
 export CONPREFIX=$DATA/espresso_env
-conda create --prefix $CONPREFIX --copy python=3.5
+conda create --prefix $CONPREFIX --copy python=3.7
 source activate $CONPREFIX
 conda install pip
 cd [musr-espresso package location]
@@ -40,7 +40,7 @@ and run
 ```bash
 pwprocess.sh
 ```
-(I would recommend editing ./.bash_profile and adding the following lines:
+(I would recommend editing ~/.bash_profile and adding the following lines:
 ```bash
 alias processruns="$HOME/processruns.sh"
 alias cancelruns="$HOME/cancelruns.sh"
