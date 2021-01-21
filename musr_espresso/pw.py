@@ -16,6 +16,9 @@ from .pointgrid import point_grid
 from .gle_utils import plot_xy, plot_scatter
 
 
+import functools
+print = functools.partial(print, flush=True)
+
 class PW(object):
     """
     PW class -- contains everything you could ever want to do with Quantum Espresso's pw.x utility

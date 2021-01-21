@@ -29,7 +29,7 @@ function cancel {
   read -p "Cancel run $1? (y(es)/n(o)/a(ll)/m(ore)/q(uit))" CHOICE < /dev/tty
 
   case "$CHOICE" in
-    a|A ) "Cancelling all runs"; ALL=1; scancel $1;;
+    a|A ) echo "Cancelling all runs"; ALL=1; scancel $1;;
     y|Y ) scancel $1;;
     n|N ) echo "Not cancelling $1";;
     m|M ) squeue | grep $1; cancel $1;;
