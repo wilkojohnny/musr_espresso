@@ -13,11 +13,13 @@ import numpy as np
 import sys
 import time
 from .pointgrid import point_grid
-from .gle_utils import plot_xy, plot_scatter
+from .gle_utils import plot_xy, plot_scatter, plot_bands
+import subprocess
 
 
 import functools
 print = functools.partial(print, flush=True)
+
 
 class PW(object):
     """
@@ -25,6 +27,13 @@ class PW(object):
     """
 
     def __init__(self, pwi_params: dict, atoms: bulk, pseudopotentials: dict, nk: tuple):
+        print('☕️ Welcome to musr_espresso -- DFT+mu tools for Quantum Espresso\n')
+        mpi_args = ' '.join(sys.argv[1:])
+        if mpi_args == '':
+            print('😴 Using serial mode. To run in parallel, just add -n <n_processors> to the end of the python '
+                  'command')
+        else:
+            print('😁 Using parallel mode. MPI options given are ' + mpi_args + '\n')
         self.pwi_params = pwi_params
         self.atoms = atoms
         self.pseudopotentials = pseudopotentials
@@ -405,3 +414,188 @@ class PW(object):
             view(all_muons_supercell)
 
         return pwi_files
+
+    def calculate_band_structure(self, k_points: list, n_inter_k_points=10, n_bands=None, cleanup=False):
+        """
+        Calculate the band structure using quantum espresso
+        :param k_points: list of [[k point label, np.ndarray of k-point in conventional basis],...]
+        :param n_inter_k_points: number of points between each of the pairs of k-points in k_points.
+        :param n_bands: numbe of bands to calculate -- nbnd in pw.x
+        :param cleanup: if True, will clean up all of the input/output files apart from the .dat and the .gle
+        :return: True if OK, False if not
+        """
+
+        # set the output directory to 'out' if not set
+        self.pwi_params = set_pwi_param(pwi_params=self.pwi_params, namespace='control', parameter_name='outdir',
+                                        parameter_value='out')
+        # set the calculation type to 'scf'
+        self.pwi_params = set_pwi_param(pwi_params=self.pwi_params, namespace='control', parameter_name='calculation',
+                                        parameter_value='scf', overwrite=True)
+        # set the prefix to the compound name
+        self.pwi_params = set_pwi_param(pwi_params=self.pwi_params, namespace='control', parameter_name='prefix',
+                                        parameter_value=str(self.atoms.symbols))
+
+        # first things first -- calculate the energy
+        energy = self.get_energy()
+
+        print('Calculated SCF energy is ' + str(energy) + ' eV')
+
+        # do the k path
+        k_path = []
+        k_path_str = ""
+        for i_k_point in range(0, len(k_points) - 1):
+            # find the difference between this vector and the next one
+            diff_k = k_points[i_k_point + 1][1] - k_points[i_k_point][1]
+            # divide this difference by the number of points per line
+            dk = diff_k / n_inter_k_points
+            # and consecutively add this to k_points[i] and store in array and write to file
+            k_j = k_points[i_k_point][1]
+            for j in range(0, n_inter_k_points):
+                k_path.append(k_j)
+                k_path_str += "{:1.5f} {:1.5f} {:1.5f} 0 \n".format(k_j[0], k_j[1], k_j[2])
+                k_j = k_j + dk
+        k_path_str = str(len(k_path)) + '\n' + k_path_str
+
+        # now we have the energy, we need to find the .pwi file -- which should be called espresso.pwi.
+        with open('espresso.pwi', 'r') as pwi_file:
+            # look for the lines that start with 'K_POINTS', 'calculation', '&SYSTEM',
+            pwi_file_lines = pwi_file.readlines()
+
+        calculation_type_line, k_points_line, system_line = None, None, None
+        for line_id, line in enumerate(pwi_file_lines):
+            if line.startswith('&SYSTEM'):
+                system_line = line_id
+            if line.lstrip().startswith('calculation'):
+                calculation_type_line = line_id
+            if line.startswith('K_POINTS'):
+                k_points_line = line_id
+                # k points will be the last thing -- so do this last
+                break
+        # now replace these lines with the new values
+        # start with calculation:
+        pwi_file_lines[calculation_type_line] = '   calculation      = \'bands\'\n'
+        # now add in nbnd:
+        pwi_file_lines.insert(system_line+1, '   nbnd     = ' + str(n_bands) + '\n')
+        # inserting a line above means the K_POINTS line is now 1 more than it was before
+        k_points_line += 1
+        # now do the k points: get rid of the original two lines, replace with the k point path
+        pwi_file_lines[k_points_line] = 'K_POINTS crystal\n'
+        pwi_file_lines[k_points_line+1] = k_path_str
+
+        with open('bands.pwi', 'w') as pwi_file:
+            pwi_file.truncate()
+            pwi_file.writelines(pwi_file_lines)
+
+        # run the command for the band structure
+        mpi_args = ' '.join(sys.argv[1:])
+        if mpi_args != '':
+            pw_bands_command = 'mpirun ' + mpi_args + ' pw.x -in bands.pwi > bands.pwo'
+        else:
+            pw_bands_command = "pw.x -in bands.pwi > bands.pwo"
+
+        try:
+            subprocess.run(pw_bands_command, shell=True, check=True)
+        except subprocess.CalledProcessError:
+            print("Sorry! The pw.x band structure calculation failed ☹️. Check the file bands.pwi and bands.pwo for "
+                  "information")
+            return False
+
+        # looks like the pw.x bands calculation worked! Now do the bands.x calculation
+        with open('bands.bandi', "w", encoding='UTF-8') as bands_file:
+            bands_file.write("&BANDS\n" +
+                             "   outdir   =  \'" + str(self.pwi_params['control']['outdir']) + "\',\n" +
+                             "   prefix   =  \'" + str(self.pwi_params['control']['prefix']) + "\',\n" +
+                             "   filband  =  \'" + str(self.pwi_params['control']['prefix']) + ".dat\',\n" +
+                             "   lsym     =  .true,\n/\n")
+
+        # now run bands.x
+        if mpi_args != '':
+            bands_command = 'mpirun ' + mpi_args + ' bands.x -i bands.bandi'
+        else:
+            bands_command = "bands.x -i bands.bandi"
+        # we have to do it this way becasue of an annoying segmentation error (quantum espresso's fault!)
+        bands_process = subprocess.run(bands_command, shell=True, check=False, universal_newlines=True,
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        bands_output = bands_process.stdout.split('\n')
+
+        # get the high symmetry x-points
+        high_symmetry_x = []
+        print('These are the high symmetry points found by quantum espresso. Check they\'re correct!')
+        try:
+            for bands_output_line in bands_output:
+                if 'high-symmetry point' in bands_output_line:
+                    print(str(bands_output_line) + ' <--> ' + str(k_points[len(high_symmetry_x)][0]) + '..?')
+                    high_symmetry_x.append(bands_output_line.split()[-1])
+        except IndexError:
+            print('❄️ Symmetry error. Check the symmetry points you gave are actually points of high symmetry.\n'
+                  '(Don\'t worry -- you don\'t have to run all this again! Use plot_bands in gle_utils to do this '
+                  'manually, if you want to proceed with these symmetry points anyway. All the DFT stuff has been done.'
+                  ')')
+            return False
+
+        # if after all that it didn't find any high symmetry points, then complain
+        if len(high_symmetry_x) == 0:
+            print('No high symmetry points were found by bands.x 🤯')
+            print('Proceeding anyway...')
+
+        # find the highest occupied energy
+        highest_occupied_energy = 0
+        with open('espresso.pwo', 'r') as scf_file:
+            scf_lines = scf_file.readlines()
+            for scf_line in scf_lines:
+                if 'highest occupied' in scf_line:
+                    print(scf_line)
+                    highest_occupied_energy = float(scf_line.split()[-1])
+
+        # now get the .dat.gnu file
+        dat_gnu_file_location = str(self.pwi_params['control']['prefix']) + '.dat.gnu'
+
+        high_symmetry_points = [[high_sym_x, k_points[i_high_sym][0]] for i_high_sym, high_sym_x
+                                in enumerate(high_symmetry_x)]
+
+        # now plot the bands! (this replaces glebands.py)
+        plot_bands(dat_gnu_file_location=dat_gnu_file_location,
+                   symm_x_labels=high_symmetry_points,
+                   fermi_energy=highest_occupied_energy)
+
+        if cleanup:
+            import os
+            os.remove('espresso.pwi')
+            os.remove('espresso.pwo')
+            os.remove('bands.pwo')
+            os.remove('bands.pwi')
+            os.remove('bands.bandi')
+            os.remove(str(self.pwi_params['control']['prefix']) + '.dat.rap')
+            os.remove(str(self.pwi_params['control']['prefix']) + '.dat.gnu')
+
+        return True
+
+
+def set_pwi_param(pwi_params: dict, namespace: str, parameter_name: str, parameter_value, overwrite=False):
+    """
+    set_pwi_param: goes through pwi_params, and sets the parameter if not there, or (if overwrite=True) overwrites it
+    :param pwi_params: dictionary of pwi_params
+    :param namespace: namespace of parameter in question
+    :param parameter_name: name of parameter in question
+    :param parameter_value: value to set the parameter to
+    :param overwrite: if True, ignores the value already set and sets to parameter_value anyway.
+    :return: pwi_params with the parameter set
+    """
+
+    # see if the namespace is there, if not, add it
+    try:
+        pwi_params[namespace]
+    except KeyError:
+        pwi_params.update({namespace: {}})
+
+    # see if the parameter is in the namespace
+    try:
+        if pwi_params[namespace][parameter_name] != '':
+            # the parameter is here! so only set if overwrite is True
+            if overwrite:
+                print('Overwriting parameter ' + parameter_name + ' to ' + str(parameter_value) + '\n')
+                pwi_params[namespace][parameter_name] = parameter_value
+    except KeyError:
+        pwi_params[namespace].update({parameter_name: parameter_value})
+
+    return pwi_params
