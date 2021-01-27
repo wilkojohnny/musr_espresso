@@ -177,11 +177,27 @@ class PW(object):
         # attach the calculator to the atoms
         atoms.set_calculator(calc)
 
+        energy = None
         # calculate energy with DFT, and return energy
         try:
             energy = atoms.get_total_energy()
         except calculator.CalculationFailed:
             energy = None
+        except AssertionError:
+            # AssertionErrors in ASE are often due to it reading the file wrong  -- so see if there is a total energy
+            # line, and just get that.
+            print('ASE can\'t find the energy, so finding it manually...')
+            with open('espresso.pwo', 'r') as out_file:
+                for line in out_file:
+                    split_line = line.split()
+                    if len(split_line) <= 2:
+                        continue
+                    if split_line[0] == '!':
+                        # this is the total energy line! so get it (and convert to Ry)
+                        energy = float(split_line[-2]) * 13.60566
+                        break
+                if energy == None:
+                    print('🤒 Oh no! I can\'t even get it from the file. Something\'s gone very wrong')
 
         return energy
 
@@ -221,7 +237,8 @@ class PW(object):
         return successful_parameters, e
 
     def setup_dftmu(self, muon_positions, supercell: list=None, run_time=12*60*60, nodes=2,
-                    devel=False, arc_priority_mode=False, prefix='PW', output_directory='dftmu', show_positions=True):
+                    devel=False, arc_priority_mode=False, prefix='PW', output_directory='dftmu',
+                    cluster_directory="~", show_positions=True):
         """
         setup_dftmu: set up a DFT+mu calculation, all ready to sumbit on SLURM
         :param muon_positions: list of muon *scaled* positions (in unit cell) -- can generate using the utilities in
@@ -235,6 +252,7 @@ class PW(object):
         :param prefix: prefix of the quantum espresso files. Suggested is [compoundname].relax.mu, but can be whatever
                        you want.
         :param output_directory: folder to store the files in.
+        :param cluster_directory: directory where the files will be on the cluster.
         :param show_positions: if True, shows the muon positions
         :return: list of the names of files created
         """
@@ -250,12 +268,14 @@ class PW(object):
             supercell = [2, 2, 2]
 
         # define write slurm function
-        def write_slurm(pw_file_name: str, directory=output_directory, runtime_s: int = run_time, n_nodes: int = nodes,
-                        devel=devel, priority=arc_priority_mode, run_id=''):
+        def write_slurm(pw_file_name: str, cluster_directory=cluster_directory, directory=output_directory,
+                        runtime_s: int = run_time, n_nodes: int = nodes, devel=devel, priority=arc_priority_mode,
+                        run_id=''):
             """
             Writes SLURM files to submit to the cluster
             :param pw_file_name: location of the pw.x file to run (if it doesn't have a .pwi extension it gets added)
-            :param directory: directory on the cluster to save (and run) everything on
+            :param cluster_directory: directory on the cluster to save (and run) everything on
+            :param directory: directory to store the slurm files locally
             :param runtime_s: runtime of the SLURM job, in seconds
             :param n_nodes: number of cores to run the script on
             :param devel: run on the development cores (for testing). If True it forces the runtime to be 600s.
@@ -313,7 +333,7 @@ class PW(object):
             slurm_file.write('. enable_arcus-b_mpi.sh\n')
 
             # move to the data directory
-            slurm_file.write('cd $DATA/' + directory + '\n')
+            slurm_file.write('cd ' + cluster_directory + '\n')
             # write out the pw.x command
             slurm_file.write('mpirun $MPI_HOSTS pw.x -i ' + pw_in_file_name + ' > ' + pw_out_file_name + '\n')
 

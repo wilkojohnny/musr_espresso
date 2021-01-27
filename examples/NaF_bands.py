@@ -35,7 +35,8 @@ k_points = [["W", np.array((1/4, 3/4, 1/2))],
             ["L", np.array((1/2, 1/2, 1/2))],
             ["\\Gamma", np.array((0, 0, 0))],  # to do LaTEX characters, do \\ instead of just \
             ["X", np.array((0, 1/2, 1/2))],
-            ["W", np.array((1/4, 3/4, 1/2))]]
+            ["W", np.array((1/4, 3/4, 1/2))],
+            ["K", np.array((3/8, 3/4, 3/8))]]
 
 # run the calculation!
 pw.calculate_band_structure(k_points, 10, 40, cleanup=True)
