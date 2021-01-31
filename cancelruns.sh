@@ -26,7 +26,7 @@ function cancel {
   fi
 
   # ask the user if they want to cancel (the < /dev/tty is important!)
-  read -p "Cancel run $1? (y(es)/n(o)/a(ll)/m(ore)/q(uit))" CHOICE < /dev/tty
+  read -p "Cancel run $1 ($3)? (y(es)/n(o)/a(ll)/m(ore)/q(uit))" CHOICE < /dev/tty
 
   case "$CHOICE" in
     a|A ) echo "Cancelling all runs"; ALL=1; scancel $1;;
