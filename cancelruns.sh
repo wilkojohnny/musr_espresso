@@ -47,6 +47,6 @@ if [ $# -eq 0 ]; then
     squeue -u $USER | while read line; do cancel $line; done
 else
     for var in "$@"; do
-       squeue -u $USER | grep "${var}[A-Za-z]" | while read line; do cancel $line; done
+       squeue -u $USER | grep " ${var}[A-Za-z]" | while read line; do cancel $line; done
     done
 fi
