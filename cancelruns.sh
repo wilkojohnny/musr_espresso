@@ -9,10 +9,10 @@ function cancel {
   # ask to cancel run, and if yes, cancel it
   # pass this function a line in squeue -u $USER.
   # $1 = JOBID
-  # $2 = PARTITION
+  # $2 = PARTITION
   # $3 = NAME
-  # $4 = USER
-  # ... but not all these are strictly necessary!
+  # $4 = USER
+  # ... but not all these are strictly necessary!
 
   # if this is the title line of squeue, skip over it
   if [ "$1" == 'JOBID' ]; then
@@ -26,17 +26,27 @@ function cancel {
   fi
 
   # ask the user if they want to cancel (the < /dev/tty is important!)
-  read -p "Cancel run $1? (y(es)/n(o)/a(ll)/m(ore)/q(uit))" CHOICE < /dev/tty
+  read -p "Cancel run $1 ($3)? (y(es)/n(o)/a(ll)/m(ore)/q(uit))" CHOICE < /dev/tty
 
   case "$CHOICE" in
     a|A ) echo "Cancelling all runs"; ALL=1; scancel $1;;
     y|Y ) scancel $1;;
     n|N ) echo "Not cancelling $1";;
-    m|M ) squeue | grep $1; cancel $1;;
+    m|M ) squeue | grep $1; cancel $@;;
     q|Q ) exit;;
     * ) echo "Invalid choice, asking agian..."; cancel $1;
   esac
   return 0
 }
 
-squeue -u $USER | while read line; do cancel $line; done
+
+# Code starts here -- if no arguments are given, then go through each line in squeue.
+# if arguments are given, find the runs with names that start with the given arguments, and get the 
+# user to confirm. This requires the format of the runs to be the argument followed by A-z letters
+if [ $# -eq 0 ]; then
+    squeue -u $USER | while read line; do cancel $line; done
+else
+    for var in "$@"; do
+       squeue -u $USER | grep "${var}[A-Za-z]" | while read line; do cancel $line; done
+    done
+fi
