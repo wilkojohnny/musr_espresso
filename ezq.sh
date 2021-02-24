@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ezq.sh -- easily add pw.x runs to the job queue
-# John Wilkinson 24/2/21
+# John Wilkinson 24/2/21. Based on the input file by Yinan Chen.
 
 function print_help {
 	cat < /dev/tty << EOF
@@ -11,11 +11,11 @@ Usage: ezq -m [memory in GB] -n [number of nodes] -p [number of thread pools] -t
 
 -m --memory: Memory required for the run. Default is 3 GB, max for Redwood is 6. You might get a JobHeldUser error in squeue if this is too high.
 
--n --nodes: Number of nodes requested. There are currently 19 available on Redwood.
+-n --nodes: Number of nodes requested. There are currently 19 on Redwood.
 
 -p --pools: Number of thread pools (the argument -npool in pw.x). Default is 2; you can probably leave this alone.
 
--t --threads: Number of threads. Sets the OMP_NUM_THREADS variable, default is 1.
+-t --threads: Number of threads. Sets the OMP_NUM_THREADS variable, default is 1. 
 
 PWI_FILE: pw.x input file. The output of this file will be saved as this file name with the extension .pwo
 EOF
@@ -88,7 +88,7 @@ run_file="${file_root}.run"
 
 cat > /dev/tty << EOF
 Setting a job up on Redwood with $nodes nodes, and hence a total of $ntot processors.
-The memory per node is $memory GB, nthreads=$nthreads, npools=$pools
+The memory per node is $memory GB, nthreads=$nthreads, npools=$npool
 The pw.x input file is $pwi_file
 The pw.x output will be saved to $pwo_file
 EOF
