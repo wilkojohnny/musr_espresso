@@ -3,7 +3,7 @@
 # ezq -- easily add pw.x runs to the job queue
 # John Wilkinson 24/2/21. Based on the input file by Yinan Chen.
 
-function print_help {
+function print_help_glamdring {
 	cat < /dev/tty << EOF
 EzQ (EasyQueue) -- Queue runs for pw.x on Redwood nodes with ease!
 -----------------------------------------------------------------
@@ -21,6 +21,13 @@ INPUT_FILE: File to run on the cluster. The supported files so far are python fi
 EOF
 }
 
+function print_help_arcus {
+	cat < /dev/tty << EOF
+EzQ (EasyQueue) -- Queue runs for pw.x on ARCUS nodes with ease!
+-----------------------------------------------------------------
+Sorry! EzQ doesn't work for ARCUS yet. 
+EOF
+}
 # set the variables of the run 
 nproc=32 #number of processors per node  !!!! This will change with the new nodes
 
@@ -42,8 +49,9 @@ key="$1"
 
 case $key in
     -h|--help)
-	    print_help
-	    exit
+	    if [ $sys_type = 'redwood' ]; then print_help_redwood; fi;
+	    if [ $sys_type = 'arcus' ]; then print_help_arcus; fi;
+            exit
 	    ;;
     -m|--memory)
     memory="$2"
