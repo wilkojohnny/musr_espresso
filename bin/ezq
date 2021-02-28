@@ -31,5 +31,5 @@ EOF
 # load in the ezq configuration (which gives the paths we want)
 . $(dirname `which $0`)/../config/ezq.conf
 
-if [ $sys_type = 'redwood' ]; then . ezq_redwood $@; fi;
+if [ $sys_type = 'glamdring' ]; then . ezq_redwood $@; fi;
 if [ $sys_type = 'arcus' ]; then . ezq_arcus $@; fi;

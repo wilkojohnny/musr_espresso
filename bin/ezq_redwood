@@ -39,7 +39,7 @@ key="$1"
 
 case $key in
     -h|--help)
-            print_help_rewood
+            print_help_glamdring
             exit
 	    ;;
     -m|--memory)
