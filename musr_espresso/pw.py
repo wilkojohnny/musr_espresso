@@ -28,12 +28,32 @@ class PW(object):
 
     def __init__(self, pwi_params: dict, atoms: bulk, pseudopotentials: dict, nk: tuple):
         print('☕️ Welcome to musr_espresso -- DFT+mu tools for Quantum Espresso\n')
-        mpi_args = ' '.join(sys.argv[1:])
-        if mpi_args == '':
+        
+        # get the mpi arguments -- these are all the arguments given to the program.
+        command_args = sys.argv[1:]
+        self.parallel = False
+        self.pw_command = 'pw.x'
+        self.mpi_command = 'mpirun'
+        if '--pw_command' in command_args:
+            pw_path_index = command_args.index('--pw_command')
+            self.pw_command = command_args[pw_path_index+1]
+            print(self.pw_command)
+            del command_args[pw_path_index+1]
+            del command_args[pw_path_index]
+        if '--mpi_command' in command_args:
+            self.parallel = True
+            mpi_path_index = command_args.index('--mpi_command')
+            self.mpi_command = command_args[mpi_path_index+1]
+            print(self.mpi_command)
+            del command_args[mpi_path_index+1]
+            del command_args[mpi_path_index]
+
+        self.mpi_args = ' '.join(command_args)
+        if self.mpi_args == '':
             print('😴 Using serial mode. To run in parallel, just add -n <n_processors> to the end of the python '
                   'command')
         else:
-            print('😁 Using parallel mode. MPI options given are ' + mpi_args + '\n')
+            print('😁 Using parallel mode. MPI options given are ' + self.mpi_args + '\n')
         self.pwi_params = pwi_params
         self.atoms = atoms
         self.pseudopotentials = pseudopotentials
@@ -168,11 +188,11 @@ class PW(object):
         calc = espresso.Espresso(pseudopotentials=self.pseudopotentials, tstress=False, tprnfor=False, kpts=nk,
                                  input_data=pwi_params)
 
-        # get the mpi arguments -- these are all the arguments given to the program.
-        mpi_args = ' '.join(sys.argv[1:])
-
-        if mpi_args != '':
-            calc.command = 'mpirun ' + mpi_args + ' pw.x -in PREFIX.pwi > PREFIX.pwo'
+        if self.mpi_args != '' or self.parallel==True:
+            calc.command = self.mpi_command + ' ' + self.mpi_args + ' ' + self.pw_command + ' -in PREFIX.pwi > PREFIX.pwo'
+            print(calc.command)
+        else:
+            calc.command = self.pw_command + " -in PREFIX.pwi > PREFIX.pwo"
 
         # attach the calculator to the atoms
         atoms.set_calculator(calc)
@@ -198,7 +218,6 @@ class PW(object):
                         break
                 if energy == None:
                     print('🤒 Oh no! I can\'t even get it from the file. Something\'s gone very wrong')
-
         return energy
 
     def do_sweep(self, sweep_param_namespace, sweep_parameter, nk, parameters, atoms=None):
@@ -506,12 +525,10 @@ class PW(object):
             pwi_file.truncate()
             pwi_file.writelines(pwi_file_lines)
 
-        # run the command for the band structure
-        mpi_args = ' '.join(sys.argv[1:])
-        if mpi_args != '':
-            pw_bands_command = 'mpirun ' + mpi_args + ' pw.x -in bands.pwi > bands.pwo'
+        if self.mpi_args != '' or self.parallel==True:
+            pw_bands_command = self.mpi_command + ' ' + self.mpi_args + ' ' + self.pw_command + ' -in bands.pwi > bands.pwo'
         else:
-            pw_bands_command = "pw.x -in bands.pwi > bands.pwo"
+            pw_bands_command = self.pw_command + " -in bands.pwi > bands.pwo"
 
         try:
             subprocess.run(pw_bands_command, shell=True, check=True)
@@ -528,11 +545,12 @@ class PW(object):
                              "   filband  =  \'" + str(self.pwi_params['control']['prefix']) + ".dat\',\n" +
                              "   lsym     =  .true,\n/\n")
 
+        bands_command = self.pw_command[:-4] + 'bands.x'
         # now run bands.x
-        if mpi_args != '':
-            bands_command = 'mpirun ' + mpi_args + ' bands.x -i bands.bandi'
+        if self.mpi_args != '' or self.parallel==True:
+            bands_command = self.mpi_command + ' ' + self.mpi_args + ' ' + bands_command + ' -i bands.bandi'
         else:
-            bands_command = "bands.x -i bands.bandi"
+            bands_command = bands_command +  " -i bands.bandi"
         # we have to do it this way becasue of an annoying segmentation error (quantum espresso's fault!)
         bands_process = subprocess.run(bands_command, shell=True, check=False, universal_newlines=True,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE)
