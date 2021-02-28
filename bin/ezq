@@ -49,7 +49,7 @@ key="$1"
 
 case $key in
     -h|--help)
-	    if [ $sys_type = 'redwood' ]; then print_help_redwood; fi;
+	    if [ $sys_type = 'glamdring' ]; then print_help_glamdring; fi;
 	    if [ $sys_type = 'arcus' ]; then print_help_arcus; fi;
             exit
 	    ;;
