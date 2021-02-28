@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# ezq.sh -- easily add pw.x runs to the job queue
+# ezq -- easily add pw.x runs to the job queue
 # John Wilkinson 24/2/21. Based on the input file by Yinan Chen.
 
 function print_help {
@@ -33,7 +33,7 @@ queue=redwood # queue type: short, long, bigmem   !!!! This will change with the
 memory=3 # required memory in GB
 
 # load in the ezq configuration (which gives the paths we want)
-. $(dirname `which $0`)/ezq.conf
+. $(dirname `which $0`)/../config/ezq.conf
 
 # parse the arguments
 while [[ $# -gt 0 ]]
