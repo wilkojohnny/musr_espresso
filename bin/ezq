@@ -33,4 +33,3 @@ EOF
 
 if [ $sys_type = 'redwood' ]; then . ezq_redwood $@; fi;
 if [ $sys_type = 'arcus' ]; then . ezq_arcus $@; fi;
-
