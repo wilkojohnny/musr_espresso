@@ -22,7 +22,7 @@ conda install pip
 cd [musr-espresso package location]
 python -m pip install ./
 ```
-(This creates the python environment, and installs musr-espresso. This only needs to be done once.
+(This creates the python environment, and installs musr-espresso. This only needs to be done once.)
 
 Then, to use the musr-espresso scripts, make sure your slurm script has the lines
 ```bash
@@ -44,12 +44,12 @@ export PATH
 ```
 (ignoring the square brackets). From then on, you should be able to use these commands from anywhere!
 
-# processruns
+### processruns
 Processruns is a script which searches through a directory of DFT+mu files, resubmits those that have run out of time,
 and reports on those that have completed or failed. To use it, all you have to do is move to whatever directory you 
 want to process, and run processruns. 
 
-# cancelruns
+### cancelruns
 Cancelruns is an interactive job canceller for slurm jobs. From anywhere, run cancelruns and it will go through each job, 
 asking if you want to cancel it. If you only want to stop jobs with a specific name (e.g PbF2), running 
 ```bash
@@ -57,7 +57,7 @@ cancelruns PbF2
 ```
 will go through only the jobs with names starting with that. You can then press 'a' to cancel all.
 
-# ezq
+### ezq
 EasyQueue (ezq) is a script designed to run on the Glamdring cluster. To use, makes sure the options in config/ezq.conf are correct
 for your system (they probably won't be!), and to submit a job to the cluster just run
 ```bash
