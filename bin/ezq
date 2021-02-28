@@ -7,17 +7,17 @@ function print_help {
 	cat < /dev/tty << EOF
 EzQ (EasyQueue) -- Queue runs for pw.x on Redwood nodes with ease!
 -----------------------------------------------------------------
-Usage: ezq -m [memory in GB] -n [number of nodes] -p [number of thread pools] -t [number of threads] PWI_FILE
+Usage: ezq -m [memory in GB] -n [number of nodes] -p [number of thread pools] -t [number of threads] INPUT_FILE
 
--m --memory: Memory required for the run. Default is 3 GB, max for Redwood is 6. You might get a JobHeldUser error in squeue if this is too high.
+-m --memory: Memory required for the run, per processor. Default is 3 GB, max for Redwood is 6. You might get a JobHeldUser error in squeue if this is too high.
 
 -n --nodes: Number of nodes requested. There are currently 19 on Redwood.
 
--p --pools: Number of thread pools (the argument -npool in pw.x). Default is 2; you can probably leave this alone.
+-p --pools: Number of thread pools (the argument -npool in pw.x). Default is 2; you can probably leave this alone, and it is ignored for python files.
 
 -t --threads: Number of threads. Sets the OMP_NUM_THREADS variable, default is 1. 
 
-PWI_FILE: pw.x input file. The output of this file will be saved as this file name with the extension .pwo
+INPUT_FILE: File to run on the cluster. The supported files so far are python files (*.py) or pw.x input files (*.pwi).
 EOF
 }
 

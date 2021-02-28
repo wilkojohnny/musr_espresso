@@ -33,19 +33,40 @@ source activate $CONPREFIX
 
 You will need to change the example SLURM script to match the conda environment created above for it to work.
 
-## pwprocess.sh and cancelruns.sh
-These are BASH scripts that is designed to run on the ARC, which monitors the progress of current runs, resumbits those which have run out of time, and reports the 
-runs that have failed, and provides an interactive interface to cancel the runs already on the system. To use these, add them to a folder on the ARC system (also adding that folder to PATH), cd to the folder where the espresso runs are stored, 
-and run
+## BASH scripts
+There are some useful BASH scripts in the bin/ folder, which are designed to run on the cluster's login nodes. 
+
+To set these up on your system, look for a file called .bash_profile or .profile in your home directory, and 
+add the lines
 ```bash
-pwprocess.sh
+PATH="[location of the bin directory in musr-espresso]":$PATH
+export PATH
 ```
-(I would recommend editing ~/.bash_profile and adding the following lines:
+(ignoring the square brackets). From then on, you should be able to use these commands from anywhere!
+
+# processruns
+Processruns is a script which searches through a directory of DFT+mu files, resubmits those that have run out of time,
+and reports on those that have completed or failed. To use it, all you have to do is move to whatever directory you 
+want to process, and run processruns. 
+
+# cancelruns
+Cancelruns is an interactive job canceller for slurm jobs. From anywhere, run cancelruns and it will go through each job, 
+asking if you want to cancel it. If you only want to stop jobs with a specific name (e.g PbF2), running 
 ```bash
-alias processruns="$HOME/processruns.sh"
-alias cancelruns="$HOME/cancelruns.sh"
+cancelruns PbF2
 ```
-Then you can use the commands processruns and cancelruns from anywhere!
+will go through only the jobs with names starting with that. You can then press 'a' to cancel all.
+
+# ezq
+EasyQueue (ezq) is a script designed to run on the Glamdring cluster. To use, makes sure the options in config/ezq.conf are correct
+for your system (they probably won't be!), and to submit a job to the cluster just run
+```bash
+ezq NaF.scf.1.pwi
+```
+which will add the pw.x input file NaF.scf.1.pwi to the job queue. Several options exist so that you can control the specfics of the 
+parallelization; running --help will list them out. 
+
+ezq works with both pw.x input files (with extension pwi) and python files (extension .py).
 
 ## PostProcessing
 The folder postprocessing/ contains a few tools for the command line, which analyse the results of a completed DFT+mu calculation. 
