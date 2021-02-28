@@ -5,8 +5,6 @@ import numpy as np
 import pandas as pd
 import csv, glob, os, sys, operator, copy
 
-# sys.path.insert(0, os.path.abspath('..')) # This to add the Soprano path to the PYTHONPATH so we can load it without installing it
-sys.path.insert(0, os.path.abspath("/Users/johnny/Documents/University/DFT/qe_utils/Franz_DFT_scripts"))
 from soprano.collection import AtomsCollection
 from soprano.analyse.phylogen import Gene, PhylogenCluster
 from . import utilities
@@ -98,6 +96,24 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
         resultsi_all.append(
             file_i)  # add recently read initial configuration to array holding all initial configurations
 
+        # find the muon index
+        possible_muon_ids = []
+        for i_atom, atom in enumerate(file_f):
+            if atom.symbol == 'H':
+                possible_muon_ids.append(i_atom)
+            elif atom.symbol == 'mu':
+                possible_muon_ids = [i_atom]
+                break
+        muon_index = None
+        if len(possible_muon_ids) == 1:
+            muon_index = possible_muon_ids[0]
+        elif len(possible_muon_ids) > 1:
+            print('Multiple possible muons found -- using the H with the highest index.')
+            muon_index = possible_muon_ids[-1]
+        else:
+            print('Can\'t find the muon in file ' + filename)
+            continue
+
         # write cif file of final configuration if cif_flag is set
         if cif_flag:
             file_f.write(filename.replace(postfix, '.cif'),
@@ -124,17 +140,17 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
         results_summary.at[iterator, ['file_name']] = filename
         results_detailedpandas[
             iterator, range(2, N_atoms + 2), 0] = atoms_symbols  # list of chemical symbols for the ions
-        results_summary.at[iterator, ['Mu_xi', 'Mu_yi', 'Mu_zi']] = np.round(fractcoords_i[-1],
+        results_summary.at[iterator, ['Mu_xi', 'Mu_yi', 'Mu_zi']] = np.round(fractcoords_i[muon_index],
                                                                              3)  # initial muon position. rounded to 3 decimals to remove floating point glitches
         results_detailedpandas[iterator, range(2, N_atoms + 2), 1:4] = np.array(np.round(fractcoords_i, 3),
                                                                                 dtype=str)  # save all initial fractional positions
-        results_summary.at[iterator, ['Mu_xf', 'Mu_yf', 'Mu_zf']] = fractcoords_f[-1]  # final fractional muon position
+        results_summary.at[iterator, ['Mu_xf', 'Mu_yf', 'Mu_zf']] = fractcoords_f[muon_index]  # final fractional muon position
         # muon location in unit cell:
-        mu_unit_cell = [(fractcoords_f[-1][i] % (1/supercell[i])) * supercell[i] for i in range(0, 3)]
+        mu_unit_cell = [(fractcoords_f[muon_index][i] % (1/supercell[i])) * supercell[i] for i in range(0, 3)]
         results_summary.at[iterator, ['Mu_unit_xf', 'Mu_unit_yf', 'Mu_unit_zf']] = mu_unit_cell # final unit cell muon position
         results_detailedpandas[iterator, range(2, N_atoms + 2), 4:7] = np.array(fractcoords_f,
                                                                                 dtype=str)  # save all final positions
-        Mu_nndist = file_f.get_distances(-1, range(0, N_atoms),
+        Mu_nndist = file_f.get_distances(muon_index, range(0, N_atoms),
                                          mic=True)  # calculate all (final) distances (in Angstrom) to the muon (accounting for equivalent atoms in adjacent cells)
         results_detailedpandas[iterator, range(2, N_atoms + 2), 7] = np.array(Mu_nndist, dtype=str)
         results_detailedpandas[iterator, range(2, N_atoms + 2), 8] = np.array(cartcoords_dist, dtype=str)
@@ -143,7 +159,7 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
 
         results_summary.at[iterator, 'E (Ry)'] = final_energy  # total energy of final scf calculation in Rydberg
 
-        NN_mindist_index, NN_mindist_value = min(enumerate(Mu_nndist[0:-1]), key=operator.itemgetter(
+        NN_mindist_index, NN_mindist_value = min(enumerate([Mu_nndist[i] for i in range(0, len(Mu_nndist)) if i != muon_index]), key=operator.itemgetter(
             1))  # find the smallest final distance to the muon and the index of that atom
         results_summary.at[iterator, 'NN ion'] = atoms_symbols[
             NN_mindist_index]  # chemical symbol of muon's nearest neighbour ion
@@ -151,9 +167,9 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
 
         Mu_nndistchange = copy.deepcopy(
             file_i)  # create an actual copy of the initial configuration. Necessary as otherwise the next line will change file_i!
-        Mu_nndistchange.pop(i=-1)  # remove initial muon site from initial configuration
-        Mu_nndistchange.append(file_f[-1])  # add final muon site to initial configuration
-        Mu_nndistchange = Mu_nndistchange.get_distances(-1, range(0, N_atoms),
+        Mu_nndistchange.pop(i=muon_index)  # remove initial muon site from initial configuration
+        Mu_nndistchange.append(file_f[muon_index])  # add final muon site to initial configuration
+        Mu_nndistchange = Mu_nndistchange.get_distances(muon_index, range(0, N_atoms),
                                                         mic=True)  # distance between all initial atom positions and final muon position
         results_detailedpandas[iterator, range(2, N_atoms + 2), 15] = np.array(Mu_nndist - Mu_nndistchange,
                                                                                dtype=str)  # change between distances to final muon position
@@ -162,8 +178,8 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
         results_detailedpandas[iterator, 1, range(len(results_detailedheaders))] = np.array(results_detailedheaders,
                                                                                             dtype=str)
         results_detailedpandas[iterator, 0, range(len(results_detailedheaders))] = np.array(
-            [atoms_symbols[-1], fractcoords_i[-1, 0], fractcoords_i[-1, 1], fractcoords_i[-1, 2], fractcoords_f[-1, 0],
-             fractcoords_f[-1, 1], fractcoords_f[-1, 2], NN_mindist_value, 'Final', 'Energy', final_energy, 'Ry',
+            [atoms_symbols[muon_index], fractcoords_i[muon_index, 0], fractcoords_i[muon_index, 1], fractcoords_i[muon_index, 2], fractcoords_f[muon_index, 0],
+             fractcoords_f[muon_index, 1], fractcoords_f[muon_index, 2], NN_mindist_value, 'Final', 'Energy', final_energy, 'Ry',
              final_energy * units.Ry, 'eV', final_energy * units.Ry / units.kB, 'K'], dtype=str)
 
     results_summary.at[:, 'dE (Ry)'] = results_summary.loc[:, 'E (Ry)'] - np.amin(
@@ -176,7 +192,7 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
     original_latt = copy.deepcopy(
         file_i)  # load the initial configuration from the last file read in. NEEDS the deepcopy function as otherwise the .pop() function will change the original!
     original_latt.pop(
-        i=-1)  # Remove and return atom at index i (default last), which here is the muon. (to do: generalise this)
+        i=muon_index)  # Remove and return atom at index i (default last), which here is the muon. (to do: generalise this)
     spg, num_syms = utilities.get_spg(original_latt, num_syms_flag=True, verbose=False)
     if set_spg is None:
         if verbose in ['min', 'max']:
