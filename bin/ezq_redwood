@@ -81,7 +81,7 @@ ntot=$(( nproc*nodes ))  #total number of processors
 
 file_root="${input_file%.*}"
 file_extension="${input_file##*.}"
-file_number=$(echo "$input_file" | grep -o ".[0-9].." | grep -o "[0-9].")
+file_number=$(echo "$input_file" | grep -Eo "\.[0-9]{1,}\." | grep -Eo "[0-9]{1,}")
 pwo_file="${file_root}.pwo"
 run_file="${file_root}.run"
 
