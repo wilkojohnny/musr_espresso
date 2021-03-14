@@ -3,17 +3,32 @@
 # ezq -- easily add pw.x runs to the job queue
 # John Wilkinson 28/2/21. Based on the input file by Yinan Chen.
 
+# load in the defaults
+. $(dirname `which $0`)/../config/ezq.conf
+
 function print_help_arcus {
 	cat < /dev/tty << EOF
 EzQ (EasyQueue) -- Queue runs for pw.x on ARCUS nodes with ease!
 -----------------------------------------------------------------
-Sorry! EzQ doesn't work for ARCUS yet. 
+
+Usage: ezq [-t [runtime]] [-n [nodes]] [-p] [-d] INPUT_FILE
+
+-t --time [runtime]: Runtime in the format HH:MM:SS. Default is 10 hours
+
+-n --nodes [nodes]: Number of nodes requested. Default is 2.
+ 
+-p --priority: `if [ $priority -eq 1 ]; then echo 'Ignored (change ezq configuration to allow one to use this)'; 
+			else echo 'Run in ARC priority mode'; fi`
+ 
+-d --devel: Run on the development cluster
+
+INPUT_FILE: Input file to run. Supports quantum espresso .pwi files, and python .py files.
 EOF
 }
 
-nodes=2  #total number of processors divided by number of processors per node
-run_time="10:00:00"
-
+nodes=2 # number of nodes to use 
+run_time='10:00:00' # runtime
+devel=0 # set to 1 to run in devel mode
 
 # parse the arguments
 while [[ $# -gt 0 ]]
@@ -35,6 +50,14 @@ case $key in
     shift # past argument
     shift # past value
     ;;
+    -p|--priority)
+    priority=1
+    shift # past argument
+    ;;
+    -d|--devel)
+    devel=1
+    shift # past argument
+    ;;
     *)    #  file name
     input_file="$1" # pwi file 
     shift # past argument
@@ -44,54 +67,82 @@ done
 
 if [ -z "$input_file" ]
 then
-	echo "No pwi file found. Aborting";
+	echo "No input file given. Aborting";
 	exit
 fi
-
 
 # now adjust the number of processors to match the number of nodes*proc per node
 
 file_root="${input_file%.*}"
 file_extension="${input_file##*.}"
-file_number=$(echo "$input_file" | grep -o ".[0-9].." | grep -o "[0-9].")
+file_number=$(echo "$input_file" | grep -Eo "\.[0-9]{1,}\." | grep -Eo "[0-9]{1,}")
 pwo_file="${file_root}.pwo"
 run_file="${file_root}.run"
 
+# check the time is sensible
+if [ $devel -eq 0 ]
+then
+	echo $run_time | grep -E "[0-9]*[0-9]\:[0-5]*[0-9]\:[0-5][0-9]" > /dev/null
+	if [ $? -ne 0 ]
+	then
+		echo "Time format invalid. The time format must be HH:MM:SS"
+		exit
+	fi
+else
+	echo $run_time | grep -E "00\:[0-1]*[0-9]\:[0-5][0-9]" > /dev/null
+	if [ $? -ne 0 ]
+	then
+		echo "Setting time to 10 mins for the development cluster"
+		run_time='00:10:00'
+	fi
+fi
+
 cat > /dev/tty << EOF
-Setting a job up on Redwood with $nodes nodes, and hence a total of $ntot processors.
-The memory per node is $memory GB, nthreads=$nthreads, npools=$npool
-The pw.x input file is $input_file
-The pw.x output will be saved to $pwo_file
+Setting up an ARCUS job with $nodes nodes, for a duration of $run_time.
+The input file is $input_file `if [ $file_extension = 'pwi' ]; then echo ', and the output will be saved to $pwo_file.'; fi`
 EOF
 
 cat > $run_file << EOF
 #!/bin/bash
 
-module load intel-compilers
-module load openmpi
-module load fftw/3.3.8-intel
+#======================================================================
+`if [ $priority -eq 1 ]; then echo '#SBATCH --qos=priority'; fi`
+#SBATCH --partition=`if [ $devel -eq 1 ]; then echo 'devel'; else echo 'compute'; fi`
+#SBATCH --constraint=haswell
+#SBATCH --ntasks-per-node=16
+#SBATCH --job-name=${file_number}${input_file}
+#SBATCH --time=$run_time
+#SBATCH --nodes=$nodes
+#======================================================================
 
-export OMP_NUM_THREADS=$nthreads
+module purge
+module load intel-compilers/2016
+module load intel-compilers/2016
+module load intel-mkl/2016
+module load mvapich2/2.1.0__intel-2016
+module load espresso/6.0.0
+
+. enable_arcus-b_mpi.sh
+
+cd $PWD
+
 
 EOF
-
-if [ $file_extension = 'pwi' ] 
-then
-cat >> $run_file << EOF
-$mpi -n $ntot -m cyclic --mpi=pmi2 $qe_path/pw.x -npool $npool < $input_file > $pwo_file
-EOF
-fi
 
 if [ $file_extension = 'py' ] 
 then
 cat >> $run_file << EOF
-module load python
+module load python/anaconda3/2019.03
 
-source $python_env/bin/activate
-python3 $input_file -n $ntot -m cyclic --mpi=pmi2 --pw_command $qe_path/pw.x --mpi_command $mpi
+source activate $python_env
+
+python3 $input_file \$MPI_HOSTS
+EOF
+elif [ $file_extension = 'pwi' ]
+then
+cat >> $run_file << EOF
+mpirun \$MPI_HOSTS pw.x -in $input_file > $pwo_file
 EOF
 fi
 
-chmod a+x $run_file
-addqueue -s -c "$file_number$file_root" -n "$nodes"x"$nproc" -m $memory -q $queue ./$run_file
-
+sbatch $run_file
