@@ -116,11 +116,6 @@ cat > $run_file << EOF
 #======================================================================
 
 module purge
-module load intel-compilers/2016
-module load intel-compilers/2016
-module load intel-mkl/2016
-module load mvapich2/2.1.0__intel-2016
-module load espresso/6.0.0
 
 . enable_arcus-b_mpi.sh
 
@@ -131,15 +126,19 @@ EOF
 
 if [ $file_extension = 'py' ] 
 then
+	for module in ${!arcus_py_modules[@]}; do
+		echo "module load $module" >> $run_file
+	done
 cat >> $run_file << EOF
-module load python/anaconda3/2019.03
-
 source activate $python_env
 
 python3 $input_file \$MPI_HOSTS
 EOF
 elif [ $file_extension = 'pwi' ]
 then
+	for module in ${!arcus_qe_modules[@]}; do
+		echo "module load $module" >> $run_file
+	done
 cat >> $run_file << EOF
 mpirun \$MPI_HOSTS pw.x -in $input_file > $pwo_file
 EOF

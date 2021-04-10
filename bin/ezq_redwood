@@ -110,6 +110,9 @@ EOF
 
 if [ $file_extension = 'pwi' ] 
 then
+	for module in ${!redwood_qe_modules[@]}; do
+		echo "module load $module" >> $run_file
+	done
 cat >> $run_file << EOF
 $mpi -n $ntot -m cyclic --mpi=pmi2 $qe_path/pw.x $ndiag -npool $npool < $input_file > $pwo_file
 EOF
@@ -117,9 +120,10 @@ fi
 
 if [ $file_extension = 'py' ] 
 then
+	for module in ${!redwood_py_modules[@]}; do
+		echo "module load $module" >> $run_file
+	done
 cat >> $run_file << EOF
-module load python
-
 source $python_env/bin/activate
 python3 $input_file -n $ntot -m cyclic --mpi=pmi2 --pw_command $qe_path/pw.x --mpi_command $mpi
 EOF
