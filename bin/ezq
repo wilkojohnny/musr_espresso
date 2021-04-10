@@ -29,7 +29,11 @@ Sorry! EzQ doesn't work for ARCUS yet.
 EOF
 }
 # load in the ezq configuration (which gives the paths we want)
-. $(dirname `which $0`)/../config/ezq.conf
+. $(dirname `which $0`)/../config/ezq_default.conf
+# also load in the user-configuration
+if [[ -f $(dirname `which $0`)/../config/ezq.conf ]]; then
+	. $(dirname `which $0`)/../config/ezq.conf
+fi 	
 
 if [ $sys_type = 'glamdring' ]; then . ezq_redwood $@; fi;
 if [ $sys_type = 'arcus' ]; then . ezq_arcus $@; fi;

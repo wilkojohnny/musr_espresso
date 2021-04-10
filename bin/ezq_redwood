@@ -15,6 +15,8 @@ Usage: ezq -m [memory in GB] -n [number of nodes] -p [number of thread pools] -t
 
 -p --pools: Number of thread pools (the argument -npool in pw.x). Default is 2; you can probably leave this alone, and it is ignored for python files.
 
+-nd --ndiag: Parallel subspace parameter. Should be a square number (-ndiag in pw.x). Ignored for Python files.
+
 -t --threads: Number of threads. Sets the OMP_NUM_THREADS variable, default is 1. 
 
 INPUT_FILE: File to run on the cluster. The supported files so far are python files (*.py) or pw.x input files (*.pwi).
@@ -32,7 +34,9 @@ queue=redwood # queue type: short, long, bigmem   !!!! This will change with the
 
 memory=3 # required memory in GB
 
-#Â parse the arguments
+ndiag=""
+
+# parse the arguments
 while [[ $# -gt 0 ]]
 do
 key="$1"
@@ -61,6 +65,11 @@ case $key in
     nthreads="$2" 
     shift # past argument
     shift # past value
+    ;;
+    -nd|--ndiag)
+    ndiag="-ndiag $2"
+    shift
+    shift
     ;;
     *)    #  file name
     input_file="$1" # pwi file 
@@ -95,10 +104,6 @@ EOF
 cat > $run_file << EOF
 #!/bin/bash
 
-module load intel-compilers
-module load openmpi
-module load fftw/3.3.8-intel
-
 export OMP_NUM_THREADS=$nthreads
 
 EOF
@@ -106,7 +111,7 @@ EOF
 if [ $file_extension = 'pwi' ] 
 then
 cat >> $run_file << EOF
-$mpi -n $ntot -m cyclic --mpi=pmi2 $qe_path/pw.x -npool $npool < $input_file > $pwo_file
+$mpi -n $ntot -m cyclic --mpi=pmi2 $qe_path/pw.x $ndiag -npool $npool < $input_file > $pwo_file
 EOF
 fi
 
