@@ -110,7 +110,7 @@ EOF
 
 if [ $file_extension = 'pwi' ] 
 then
-	for module in ${!redwood_qe_modules[@]}; do
+	for module in ${redwood_qe_modules[@]}; do
 		echo "module load $module" >> $run_file
 	done
 cat >> $run_file << EOF
@@ -120,7 +120,7 @@ fi
 
 if [ $file_extension = 'py' ] 
 then
-	for module in ${!redwood_py_modules[@]}; do
+	for module in ${redwood_py_modules[@]}; do
 		echo "module load $module" >> $run_file
 	done
 cat >> $run_file << EOF
