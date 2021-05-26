@@ -107,10 +107,15 @@ class PW(object):
         :param pwi_parameter: parameter to change
         :param pwi_param_values: array of values to try
         :param nk: array of nks to try (if None, just uses the class's saved nk (i.e self.nk))
-        :param small_sf: scale factor to apply to the cell for the small cell energy calculation
+        :param small_sf: scale factor to apply to the cell for the small cell energy calculation. Can be a tuple of
+                         (xscale, yscale, zscale) *or* a float of the scale factor
         :param plot: do plot of results
         :return: list with entries [nk_id][param][dE]
         """
+
+        # if small_sf is just one number, turn it in to a tuple of (x, y, z)
+        if isinstance(small_sf, float):
+            small_sf = (small_sf, small_sf, small_sf)
 
         # if nk is a list, then loop up it
         if isinstance(nk, list):
