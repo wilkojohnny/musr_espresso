@@ -1,33 +1,8 @@
 #!/bin/bash
 
 # ezq -- easily add pw.x runs to the job queue
-# John Wilkinson 24/2/21. Based on the input file by Yinan Chen.
+# John Wilkinson 24/2/21. Redwood version based on the input file by Yinan Chen.
 
-function print_help_glamdring {
-	cat < /dev/tty << EOF
-EzQ (EasyQueue) -- Queue runs for pw.x on Redwood nodes with ease!
------------------------------------------------------------------
-Usage: ezq -m [memory in GB] -n [number of nodes] -p [number of thread pools] -t [number of threads] INPUT_FILE
-
--m --memory: Memory required for the run, per processor. Default is 3 GB, max for Redwood is 6. You might get a JobHeldUser error in squeue if this is too high.
-
--n --nodes: Number of nodes requested. There are currently 19 on Redwood.
-
--p --pools: Number of thread pools (the argument -npool in pw.x). Default is 2; you can probably leave this alone, and it is ignored for python files.
-
--t --threads: Number of threads. Sets the OMP_NUM_THREADS variable, default is 1. 
-
-INPUT_FILE: File to run on the cluster. The supported files so far are python files (*.py) or pw.x input files (*.pwi).
-EOF
-}
-
-function print_help_arcus {
-	cat < /dev/tty << EOF
-EzQ (EasyQueue) -- Queue runs for pw.x on ARCUS nodes with ease!
------------------------------------------------------------------
-Sorry! EzQ doesn't work for ARCUS yet. 
-EOF
-}
 # load in the ezq configuration (which gives the paths we want)
 . $(dirname `which $0`)/../config/ezq_default.conf
 # also load in the user-configuration
@@ -37,3 +12,5 @@ fi
 
 if [ $sys_type = 'glamdring' ]; then . ezq_redwood $@; fi;
 if [ $sys_type = 'arcus' ]; then . ezq_arcus $@; fi;
+if [ $sys_type = 'arcus-c' ]; then . ezq_arcus_c $@; fi;
+
