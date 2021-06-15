@@ -5,6 +5,7 @@ Created by John Wilkinson, 8/10/2020
 """
 
 from ase import io, build, atoms
+from ase.io import espresso as ioespresso
 from ase.visualize import view
 from ase.build import bulk
 from ase.calculators import espresso, calculator
@@ -205,7 +206,31 @@ class PW(object):
         energy = None
         # calculate energy with DFT, and return energy
         try:
-            energy = atoms.get_total_energy()
+            # i knowwww, we could just do atoms.get_total_energy(). BUT this doesn't work if you have multiple
+            # hubbard U parameters (try it!) so we have to do everything manually instead...
+            self.write_pw_input()
+            # the below lines are the bits copied from ASE which run the calculation (I had to copy this
+            # because otherwise the file will be rewritten)
+            if 'PREFIX' in calc.command:
+                command = calc.command.replace('PREFIX', calc.prefix)
+            try:
+                proc = subprocess.Popen(command, shell=True, cwd=calc.directory)
+            except OSError as err:
+                # Actually this may never happen with shell=True, since
+                # probably the shell launches successfully.  But we soon want
+                # to allow calling the subprocess directly, and then this
+                # distinction (failed to launch vs failed to run) is useful.
+                msg = 'Failed to execute "{}"'.format(command)
+                raise EnvironmentError(msg) from err
+            errorcode = proc.wait()
+            if errorcode:
+                path = os.path.abspath(calc.directory)
+                msg = ('Calculator "{}" failed with command "{}" failed in '
+                       '{} with error code {}'.format(calc.name, command,
+                                                      path, errorcode))
+                raise CalculationFailed(msg)
+            calc.read_results()
+            energy = calc.results['energy']
         except calculator.CalculationFailed:
             energy = None
         except AssertionError:
@@ -224,6 +249,74 @@ class PW(object):
                 if energy == None:
                     print('🤒 Oh no! I can\'t even get it from the file. Something\'s gone very wrong')
         return energy
+
+    def write_pw_input(self, filename='espresso.pwi'):
+        """
+        Write the pw.x input file (mostly uses ASE's stuff, but also lets you do the element names instead
+        of ids for element-dependent properties (e.g Hubbard U), which can crash ASE
+        :param filename: filename to write to
+        :return:
+        """
+
+        # take out all the bits in the input parameters with brackets and put into a separate dict
+        problem_keys = {}
+        for namespace in self.pwi_params:
+            current_namespace = {}
+            for key in list(self.pwi_params[namespace]):
+                if '(' in key:
+                    current_namespace.update({key: self.pwi_params[namespace][key]})
+                    del self.pwi_params[namespace][key]
+            problem_keys.update({namespace: current_namespace})
+
+        ioespresso.write_espresso_in(open(filename, 'w'), self.atoms, self.pwi_params, self.pseudopotentials,
+                                     kpts=self.nk)
+
+        # now put the problem keys into the pwi file:
+
+        # read in the pwi file lines
+        with open(filename, 'r') as f:
+            lines = f.readlines()
+
+        # find the pseudopotentials
+        pp_i = lines.index('ATOMIC_SPECIES\n') + 1
+        pp_names = []
+        while lines[pp_i] != '\n':
+            this_line_split = lines[pp_i].split()
+            pp_names.append(this_line_split[0])
+            pp_i += 1
+
+        # for each problem_key namespace...
+        for namespace in problem_keys:
+            # ... find the line which is the beginning of the namespace
+            namespace_line = '&' + namespace.upper() + '\n'
+            namespace_line_id = lines.index(namespace_line)
+            # now add in the problem bits
+            for key in list(problem_keys[namespace]):
+                species_identifier = key[key.find("(")+1:key.find(")")]
+                if species_identifier in pp_names:
+                    # the user used the atomic symbol instead of a numeric ID -- so see how many of these
+                    # are in the pw.x file (there might be more than 1 for e.g AFM structures)
+                    pp_index = pp_names.index(species_identifier)
+                    while pp_index < len(pp_names):
+                        if species_identifier in pp_names[pp_index]:
+                            # we have a key <--> species match!
+                            this_key = key.split('(')[0] + '(' + str(pp_index + 1) + ')'
+                            lines.insert(namespace_line_id + 1, this_key + ' = ' + str(problem_keys[namespace][key]) + '\n')
+                        pp_index += 1
+                else:
+                    # there doesn't seem to be a relation between the species identifier and the element names,
+                    # so just put it in the file and don't faff
+                    lines.insert(namespace_line_id+1, key + ' = ' + str(problem_keys[namespace][key]) + '\n')
+
+        # now write it out again
+        with open(filename, 'w') as f:
+            file_contents = "".join(lines)
+            f.write(file_contents)
+
+        # replace the problem keys in the dict
+        for namespace in problem_keys:
+            self.pwi_params.update({namespace: problem_keys[namespace]})
+
 
     def do_sweep(self, sweep_param_namespace, sweep_parameter, nk, parameters, atoms=None):
         if atoms is None:
