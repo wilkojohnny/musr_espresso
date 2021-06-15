@@ -224,11 +224,7 @@ class PW(object):
                 raise EnvironmentError(msg) from err
             errorcode = proc.wait()
             if errorcode:
-                path = os.path.abspath(calc.directory)
-                msg = ('Calculator "{}" failed with command "{}" failed in '
-                       '{} with error code {}'.format(calc.name, command,
-                                                      path, errorcode))
-                raise CalculationFailed(msg)
+                raise calculator.CalculationFailed(msg)
             calc.read_results()
             energy = calc.results['energy']
         except calculator.CalculationFailed:
@@ -315,7 +311,7 @@ class PW(object):
 
         # replace the problem keys in the dict
         for namespace in problem_keys:
-            self.pwi_params.update({namespace: problem_keys[namespace]})
+            self.pwi_params[namespace].update(problem_keys[namespace])
 
 
     def do_sweep(self, sweep_param_namespace, sweep_parameter, nk, parameters, atoms=None):
