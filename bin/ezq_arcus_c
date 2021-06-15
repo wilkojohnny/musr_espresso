@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # ezq -- easily add pw.x runs to the job queue
-# John Wilkinson 28/2/21. Based on the input file by Yinan Chen.
+# John Wilkinson 26/5/21
+
 
 function print_help_arcus {
 	cat < /dev/tty << EOF
@@ -12,20 +13,23 @@ Usage: ezq [-t [runtime]] [-n [nodes]] [-p] [-d] INPUT_FILE
 
 -t --time [runtime]: Runtime in the format HH:MM:SS. Default is 10 hours
 
--n --nodes [nodes]: Number of nodes requested. Default is 2.
+-p --partition [long|medium|short|devel]: Partition to run on. You must check that this is compatiable with the time argument -- I won't check for you
+
+-n --nodes [nodes]: Number of nodes requested. Default is 2. All 48 CPUs in a node will be requested.
+
+-m --memory [memory]: memory in GB per CPU. Default is 2 GB per CPU
  
--p --priority: `if [ $priority -eq 1 ]; then echo 'Ignored (change ezq configuration to allow one to use this)'; 
+--priority: `if [ $priority -eq 1 ]; then echo 'Ignored (change ezq configuration to allow one to use this)'; 
 			else echo 'Run in ARC priority mode'; fi`
  
--d --devel: Run on the development cluster
-
 INPUT_FILE: Input file to run. Supports quantum espresso .pwi files, and python .py files.
 EOF
 }
 
 nodes=2 # number of nodes to use 
+memory=2 # memory per core
 run_time='10:00:00' # runtime
-devel=0 # set to 1 to run in devel mode
+partition='medium' # partition
 
 # parse the arguments
 while [[ $# -gt 0 ]]
@@ -42,17 +46,23 @@ case $key in
     shift # past argument
     shift # past value
     ;;
+    -m|--memory)
+    memory="$2"
+    shift # past argument
+    shift # past value
+    ;;
     -n|--nodes)
     nodes="$2"
     shift # past argument
     shift # past value
     ;;
-    -p|--priority)
-    priority=1
+    -p|--partition)
+    partition="$2" 
     shift # past argument
+    shift # past value
     ;;
-    -d|--devel)
-    devel=1
+    --priority)
+    priority=1
     shift # past argument
     ;;
     *)    #  file name
@@ -77,26 +87,26 @@ pwo_file="${file_root}.pwo"
 run_file="${file_root}.run"
 
 # check the time is sensible
-if [ $devel -eq 0 ]
+if [ $partition = 'devel' ]
 then
-	echo $run_time | grep -E "[0-9]*[0-9]\:[0-5]*[0-9]\:[0-5][0-9]" > /dev/null
-	if [ $? -ne 0 ]
-	then
-		echo "Time format invalid. The time format must be HH:MM:SS"
-		exit
-	fi
-else
 	echo $run_time | grep -E "00\:[0-1]*[0-9]\:[0-5][0-9]" > /dev/null
 	if [ $? -ne 0 ]
 	then
 		echo "Setting time to 10 mins for the development cluster"
 		run_time='00:10:00'
 	fi
+else
+	echo $run_time | grep -E "[0-9]*[0-9]\:[0-5]*[0-9]\:[0-5][0-9]" > /dev/null
+	if [ $? -ne 0 ]
+	then
+		echo "Time format invalid. The time format must be HH:MM:SS"
+		exit
+	fi
 fi
 
 cat > /dev/tty << EOF
-Setting up an ARCUS job with $nodes nodes, for a duration of $run_time.
-The input file is $input_file `if [ $file_extension = 'pwi' ]; then echo ', and the output will be saved to $pwo_file.'; fi`
+Setting up an ARCUS job with $nodes nodes ($memory GB per CPU), for a duration of $run_time, on the partition $partition.
+The input file is $input_file `if [ $file_extension = 'pwi' ]; then echo ", and the output will be saved to $pwo_file."; fi`
 EOF
 
 cat > $run_file << EOF
@@ -104,9 +114,9 @@ cat > $run_file << EOF
 
 #======================================================================
 `if [ $priority -eq 1 ]; then echo '#SBATCH --qos=priority'; fi`
-#SBATCH --partition=`if [ $devel -eq 1 ]; then echo 'devel'; else echo 'compute'; fi`
-#SBATCH --constraint=haswell
-#SBATCH --ntasks-per-node=16
+#SBATCH --partition=${partition}
+#SBATCH --ntasks-per-node=48
+#SBATCH --mem-per-cpu=${memory}G
 #SBATCH --job-name=${file_number}${input_file}
 #SBATCH --time=$run_time
 #SBATCH --nodes=$nodes
@@ -114,16 +124,14 @@ cat > $run_file << EOF
 
 module purge
 
-. enable_arcus-b_mpi.sh
-
 cd $PWD
 
 
 EOF
-
+ 
 if [ $file_extension = 'py' ] 
 then
-	for module in ${!arcus_py_modules[@]}; do
+	for module in ${arcus_c_py_modules[@]}; do
 		echo "module load $module" >> $run_file
 	done
 cat >> $run_file << EOF
@@ -133,7 +141,7 @@ python3 $input_file \$MPI_HOSTS
 EOF
 elif [ $file_extension = 'pwi' ]
 then
-	for module in ${!arcus_qe_modules[@]}; do
+	for module in ${arcus_c_qe_modules[@]}; do
 		echo "module load $module" >> $run_file
 	done
 cat >> $run_file << EOF
