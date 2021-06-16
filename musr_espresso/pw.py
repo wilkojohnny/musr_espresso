@@ -208,7 +208,7 @@ class PW(object):
         try:
             # i knowwww, we could just do atoms.get_total_energy(). BUT this doesn't work if you have multiple
             # hubbard U parameters (try it!) so we have to do everything manually instead...
-            self.write_pw_input()
+            self.write_pw_input(atoms=atoms, nk=nk, pwi_params=pwi_params)
             # the below lines are the bits copied from ASE which run the calculation (I had to copy this
             # because otherwise the file will be rewritten)
             if 'PREFIX' in calc.command:
@@ -246,10 +246,13 @@ class PW(object):
                     print('🤒 Oh no! I can\'t even get it from the file. Something\'s gone very wrong')
         return energy
 
-    def write_pw_input(self, filename='espresso.pwi'):
+    def write_pw_input(self, atoms: bulk = None, nk = None, pwi_params = None, filename='espresso.pwi'):
         """
         Write the pw.x input file (mostly uses ASE's stuff, but also lets you do the element names instead
         of ids for element-dependent properties (e.g Hubbard U), which can crash ASE
+        :param atoms: atoms to calculate on
+        :param nk: k-grid to calculate on
+        :param pwi_params:  pw.x input parameters
         :param filename: filename to write to
         :return:
         """
@@ -264,8 +267,8 @@ class PW(object):
                     del self.pwi_params[namespace][key]
             problem_keys.update({namespace: current_namespace})
 
-        ioespresso.write_espresso_in(open(filename, 'w'), self.atoms, self.pwi_params, self.pseudopotentials,
-                                     kpts=self.nk)
+        ioespresso.write_espresso_in(open(filename, 'w'), atoms, pwi_params, self.pseudopotentials,
+                                     kpts=nk)
 
         # now put the problem keys into the pwi file:
 
