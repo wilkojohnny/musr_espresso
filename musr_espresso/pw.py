@@ -16,6 +16,7 @@ import time
 from .pointgrid import point_grid
 from .gle_utils import plot_xy, plot_scatter, plot_bands
 import subprocess
+import os
 
 
 import functools
@@ -127,8 +128,9 @@ class PW(object):
             if plot:
                 all_parameters = [res[0] for res in result]
                 dE = [res[1] for res in result]
-                plot_xy(all_parameters, dE, pwi_parameter + ' and scf energy,' + str(self.atoms.symbols),
-                        legend=["nk=" + str(i) for i in nk], ytitle="E(a)-E({:.3f}a) (Ry)".format(small_sf),
+                plot_xy(all_parameters, dE, pwi_parameter + ' and scf energy, ' + str(self.atoms.symbols),
+                        legend=["nk=" + str(i) for i in nk],
+                        ytitle="$E(a)-E(({:.3f}, {:.3f}, {:.3f}).a)$ (Ry)".format(*small_sf),
                         xtitle=pwi_parameter)
             return result
         elif nk is None:
@@ -170,7 +172,8 @@ class PW(object):
             if plot:
                 plot_xy(close_atoms_parameters, this_dE, pwi_parameter + ' and scf energy,' +
                         str(self.atoms.symbols), legend="k-grid=" + str(nk),
-                        ytitle="E(a)-E({:.3f}a) (Ry)".format(small_sf), xtitle=pwi_parameter)
+                        xtitle=pwi_parameter,
+                        ytitle="$E(a)-E(({:.3f}, {:.3f}, {:.3f}).a)$ (Ry)".format(*small_sf))
 
             return [close_atoms_parameters, this_dE]
 
@@ -267,8 +270,14 @@ class PW(object):
                     del self.pwi_params[namespace][key]
             problem_keys.update({namespace: current_namespace})
 
-        ioespresso.write_espresso_in(open(filename, 'w'), atoms, pwi_params, self.pseudopotentials,
-                                     kpts=nk)
+        try:
+            # try making the folder, but don't worry if it can't...
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+        except FileNotFoundError:
+            pass
+        with open(filename, 'w') as f:
+            ioespresso.write_espresso_in(f, atoms, pwi_params, self.pseudopotentials,
+                                         kpts=nk)
 
         # now put the problem keys into the pwi file:
 
@@ -516,7 +525,9 @@ class PW(object):
             pw_calc.label = output_directory + '/' + this_prefix  # label is basically the location of the file
             self.pwi_params['control']['prefix'] = this_prefix
             # write the pw.x input
-            pw_calc.write_input(supercell_atoms)
+            # pw_calc.write_input(supercell_atoms)
+            self.write_pw_input(atoms=supercell_atoms, nk=self.nk, pwi_params=self.pwi_params,
+                                filename=pw_calc.label + '.pwi')
             # write the SLURM input file
             slurm_files.append(write_slurm(pw_file_name=this_prefix, run_id=str(muon_inc)))
             pwi_files.append(this_prefix + '.pwi')
