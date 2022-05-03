@@ -1,0 +1,156 @@
+#!/bin/bash
+
+# ezq -- easily add pw.x runs to the job queue
+# John Wilkinson 03/05/22 (SCARF version)
+
+
+function print_help_scarf {
+	cat < /dev/tty << EOF
+EzQ (EasyQueue) -- Queue runs for pw.x on SCARF nodes with ease!
+----------------------------------------------------------------
+
+Usage: ezq [-t [runtime]] [-nc [no_cpus]] [-p] [-d] INPUT_FILE
+
+-t --time [runtime]: Runtime in the format HH:MM:SS. Default is 10 hours
+
+-p --partition [scarf|devel]: Partition to run on. You must check that this is compatiable with the time argument -- I won't check for you
+
+-nc --no_cpu [number of cpus]: Number of CPUs requested. Default is 32. NOT the number of nodes!
+
+-m --memory [memory]: memory in GB per CPU. Default is 4 GB per CPU
+ 
+INPUT_FILE: Input file to run. Supports quantum espresso .pwi files, and python .py files.
+EOF
+}
+
+no_cpus=32 # number of CPUs to use 
+memory=4 # memory per core
+run_time='10:00:00' # runtime
+partition='scarf' # partition
+
+#Â parse the arguments
+while [[ $# -gt 0 ]]
+do
+key="$1"
+
+case $key in
+    -h|--help)
+            print_help_scarf
+            exit
+	    ;;
+    -t|--time)
+    run_time="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -m|--memory)
+    memory="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -nc|--no_cpu)
+    no_cpus="$2"
+    shift # past argument
+    shift # past value
+    ;;
+    -n|--nodes)
+    no_cpus=$(( "$2" * 32 ))
+    shift # past argument
+    shift # past value
+    ;;
+    -p|--partition)
+    partition="$2" 
+    shift # past argument
+    shift # past value
+    ;;
+    --priority)
+    priority=1
+    shift # past argument
+    ;;
+    *)    #  file name
+    input_file="$1" # pwi file 
+    shift # past argument
+    ;;
+esac
+done
+
+if [ -z "$input_file" ]
+then
+	echo "No input file given. Aborting";
+	exit
+fi
+
+# now adjust the number of processors to match the number of nodes*proc per node
+
+file_root="${input_file%.*}"
+file_extension="${input_file##*.}"
+file_number=$(echo "$input_file" | grep -Eo "\.[0-9]{1,}\." | grep -Eo "[0-9]{1,}")
+pwo_file="${file_root}.pwo"
+run_file="${file_root}.run"
+
+# check the time is sensible
+if [ $partition = 'devel' ]
+then
+	echo $run_time | grep -E "[0-1][0-9]\:[0-5]*[0-9]\:[0-5]*[0-9]" > /dev/null
+	if [ $? -ne 0 ]
+	then
+		echo "Setting time to 12 hours for the development cluster"
+		run_time='12:00:00'
+	fi
+else
+	echo $run_time | grep -E "[0-9]*[0-9]\:[0-5]*[0-9]\:[0-5][0-9]" > /dev/null
+	if [ $? -ne 0 ]
+	then
+		echo "Time format invalid. The time format must be HH:MM:SS"
+		exit
+	fi
+fi
+
+cat > /dev/tty << EOF
+Setting up a SCARF job with $no_cpus CPUs ($memory GB per CPU), for a duration of $run_time, on the partition $partition.
+The input file is $input_file `if [ $file_extension = 'pwi' ]; then echo ", and the output will be saved to $pwo_file."; fi`
+EOF
+
+memory=$(( $memory*1000))
+
+cat > $run_file << EOF
+#!/bin/bash
+
+#======================================================================
+#SBATCH -p ${partition}
+#SBATCH -n ${no_cpus}
+#SBATCH --mem-per-cpu=${memory}
+#SBATCH --job-name=${file_number}${input_file}
+#SBATCH --time=$run_time
+#======================================================================
+
+module purge
+
+export OMP_NUM_THREADS=1
+
+cd $PWD
+
+
+EOF
+ 
+if [ $file_extension = 'py' ] 
+then
+	for module in ${scarf_py_modules[@]}; do
+		echo "module load $module" >> $run_file
+	done
+cat >> $run_file << EOF
+source activate $python_env
+
+python3 $input_file \$MPI_HOSTS
+EOF
+elif [ $file_extension = 'pwi' ]
+then
+	for module in ${scarf_qe_modules[@]}; do
+		echo "module load $module" >> $run_file
+	done
+cat >> $run_file << EOF
+mpirun \$MPI_HOSTS pw.x -in $input_file > $pwo_file
+EOF
+fi
+
+sbatch $run_file

@@ -13,4 +13,5 @@ fi
 if [ $sys_type = 'glamdring' ]; then . ezq_redwood $@; fi;
 if [ $sys_type = 'arcus' ]; then . ezq_arcus $@; fi;
 if [ $sys_type = 'arcus-c' ]; then . ezq_arcus_c $@; fi;
+if [ $sys_type = 'scarf' ]; then . ezq_scarf $@; fi;
 
