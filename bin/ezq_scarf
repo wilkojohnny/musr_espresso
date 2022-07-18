@@ -3,6 +3,12 @@
 # ezq -- easily add pw.x runs to the job queue
 # John Wilkinson 03/05/22 (SCARF version)
 
+RED='\033[0;31m'
+LRED='\033[1;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;36m'
+LBLUE='\033[1;36m'
+NC='\033[0m' # No Color
 
 function print_help_scarf {
 	cat < /dev/tty << EOF
@@ -18,6 +24,8 @@ Usage: ezq [-t [runtime]] [-nc [no_cpus]] [-p] [-d] INPUT_FILE
 -nc --no_cpu [number of cpus]: Number of CPUs requested. Default is 32. NOT the number of nodes!
 
 -m --memory [memory]: memory in GB per CPU. Default is 4 GB per CPU
+
+-j --jk: Just kidding mode -- do all the preparation, but don't actually run sbatch on the slurm file
  
 INPUT_FILE: Input file to run. Supports quantum espresso .pwi files, and python .py files.
 EOF
@@ -27,6 +35,7 @@ no_cpus=32 # number of CPUs to use
 memory=4 # memory per core
 run_time='10:00:00' # runtime
 partition='scarf' # partition
+joke_mode=0  # joke mode (aka just kidding mode)
 
 #Â parse the arguments
 while [[ $# -gt 0 ]]
@@ -67,6 +76,10 @@ case $key in
     priority=1
     shift # past argument
     ;;
+    -j | --jk)
+    joke_mode=1
+    shift # past argument
+    ;;
     *)    #  file name
     input_file="$1" # pwi file 
     shift # past argument
@@ -74,10 +87,16 @@ case $key in
 esac
 done
 
-if [ -z "$input_file" ]
+if [ -z "$input_file"]
 then
-	echo "No input file given. Aborting";
-	exit
+	if [ $joke_mode -eq 1 ]
+	then
+		printf "${BLUE}In jk mode, and no input given. Assuming a pw.x input file named PWSCF.1.pwi, change the slurm file afterwards if this is incorrect${NC}\n";
+		input_file="PWSCF.1.pwi"
+	else
+		echo "No input file given. Aborting";
+		exit
+	fi
 fi
 
 # now adjust the number of processors to match the number of nodes*proc per node
@@ -153,4 +172,9 @@ mpirun \$MPI_HOSTS pw.x -in $input_file > $pwo_file
 EOF
 fi
 
-sbatch $run_file
+if [ $joke_mode -eq 1 ]
+then
+	printf "${BLUE}Jk mode -- I've just saved the slurm file as $run_file${NC}\n"	
+else
+	sbatch $run_file
+fi
