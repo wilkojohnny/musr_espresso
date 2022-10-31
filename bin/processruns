@@ -27,7 +27,7 @@ function extract_slurm_name {
 function resubmit {
   pwo_file=$1
   pwi_file="${pwo_file%?}i"
-  slurm_file="${pwi_file}_slurm.run"
+  slurm_file="${pwi_file}.run"
   # check the run has not already been submitted:
   # get the run number from the run
   slurm_name="$(extract_slurm_name ${pwi_file})"
@@ -79,8 +79,11 @@ for pwo_file in *.pwo; do
 
   if  [[ $? -eq 0 ]] ; then
     printf "${BLUE}${pwo_file}"
-    resubmit $pwo_file
-
+    # if the addqueue command exists, then we can't just do sbatch -- so don't resubmit
+    if ! command -v addqueue &> /dev/null
+    then
+	    resubmit $pwo_file
+    fi
   else
     # if it doesn't say the maxiumum time is exceeded, it might still need resubmitting.
     # check for this by getting the runs which are finished (that say 'JOB DONE')
@@ -91,7 +94,11 @@ for pwo_file in *.pwo; do
        if [[ $? -eq 1 ]] ; then
          # this file is done but not finished, and no errors - so resubmit if needed
          printf "${BLUE}${pwo_file}"
-         resubmit $pwo_file
+	 # if the addqueue command exists, then we can't just do sbatch -- so don't resubmit
+	 if ! command -v addqueue &> /dev/null
+	 then
+		 resubmit $pwo_file
+	 fi
        fi
     fi
   fi
