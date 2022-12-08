@@ -63,7 +63,7 @@ case $key in
     shift # past value
     ;;
     -n|--nodes)
-    no_cpus=$(( "$2" * 32 ))
+    no_cpus=$(( $2 * 32 ))
     shift # past argument
     shift # past value
     ;;
@@ -87,7 +87,7 @@ case $key in
 esac
 done
 
-if [ -z "$input_file"]
+if [ -z "$input_file" ]
 then
 	if [ $joke_mode -eq 1 ]
 	then
@@ -147,6 +147,8 @@ module purge
 
 export OMP_NUM_THREADS=1
 
+MPI_HOSTS='-n ${no_cpus}'
+
 cd $PWD
 
 
@@ -157,8 +159,16 @@ then
 	for module in ${scarf_py_modules[@]}; do
 		echo "module load $module" >> $run_file
 	done
+
+if [ $not_conda = 1 ]
+then
+	env_activate=". $python_env/bin/activate"
+else
+	env_activate="source activate $python_env"
+fi
+
 cat >> $run_file << EOF
-source activate $python_env
+$env_activate
 
 python3 $input_file \$MPI_HOSTS
 EOF
