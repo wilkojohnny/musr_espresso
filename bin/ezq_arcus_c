@@ -109,6 +109,8 @@ Setting up an ARCUS job with $nodes nodes ($memory GB per CPU), for a duration o
 The input file is $input_file `if [ $file_extension = 'pwi' ]; then echo ", and the output will be saved to $pwo_file."; fi`
 EOF
 
+cores=$(( 48*$nodes))
+
 cat > $run_file << EOF
 #!/bin/bash
 
@@ -126,6 +128,7 @@ module purge
 
 cd $PWD
 
+cores=$cores
 
 EOF
  
@@ -137,7 +140,7 @@ then
 cat >> $run_file << EOF
 source activate $python_env
 
-python3 $input_file \$MPI_HOSTS
+python3 $input_file -n \$cores
 EOF
 elif [ $file_extension = 'pwi' ]
 then
