@@ -227,10 +227,11 @@ class PW(object):
                 raise EnvironmentError(msg) from err
             errorcode = proc.wait()
             if errorcode:
-                raise calculator.CalculationFailed(msg)
+                raise calculator.CalculationFailed('Calculation failed with code.' + str(errorcode))
             calc.read_results()
             energy = calc.results['energy']
         except calculator.CalculationFailed:
+            print('Calculation failed.')
             energy = None
         except AssertionError:
             # AssertionErrors in ASE are often due to it reading the file wrong  -- so see if there is a total energy
