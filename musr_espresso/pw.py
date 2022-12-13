@@ -140,42 +140,42 @@ class PW(object):
             # if nk is just one integer, assume the user wants a k-grid of (nk, nk, nk)
             if isinstance(nk, int):
                 nk = (nk, nk, nk)
-            parameters, energies = self.do_sweep(sweep_param_namespace=pwi_namespace,
-                                                 sweep_parameter=pwi_parameter,
-                                                 nk=nk,
-                                                 parameters=pwi_param_values)
+        parameters, energies = self.do_sweep(sweep_param_namespace=pwi_namespace,
+                                             sweep_parameter=pwi_parameter,
+                                             nk=nk,
+                                             parameters=pwi_param_values)
 
-            close_atoms = copy.deepcopy(self.atoms)
-            close_atoms.set_cell(self.atoms.get_cell()*small_sf, scale_atoms=True)
+        close_atoms = copy.deepcopy(self.atoms)
+        close_atoms.set_cell(self.atoms.get_cell()*small_sf, scale_atoms=True)
 
-            close_atoms_parameters, close_energy = self.do_sweep(atoms=close_atoms,
-                                                                 sweep_param_namespace=pwi_namespace,
-                                                                 sweep_parameter=pwi_parameter,
-                                                                 nk=nk,
-                                                                 parameters=parameters)
+        close_atoms_parameters, close_energy = self.do_sweep(atoms=close_atoms,
+                                                             sweep_param_namespace=pwi_namespace,
+                                                             sweep_parameter=pwi_parameter,
+                                                             nk=nk,
+                                                             parameters=parameters)
 
-            this_dE = []
-            # subtract the unperturbed lattice energies from the perturbed (small) - but only subtract if not none...
-            # for each close_atom_parameter
-            for i_clp in range(0, len(close_atoms_parameters)):
-                clp = close_atoms_parameters[i_clp]
-                # find the location in the array of parameters where this cl_par is
-                i_p = parameters.index(clp)
-                # use that index to find the energy of the normal-sized (unperturbed) lattice at this parameter
-                energy_change = energies[i_p] - close_energy[i_clp]
-                # append to dE
-                this_dE.append(energy_change)
+        this_dE = []
+        # subtract the unperturbed lattice energies from the perturbed (small) - but only subtract if not none...
+        # for each close_atom_parameter
+        for i_clp in range(0, len(close_atoms_parameters)):
+            clp = close_atoms_parameters[i_clp]
+            # find the location in the array of parameters where this cl_par is
+            i_p = parameters.index(clp)
+            # use that index to find the energy of the normal-sized (unperturbed) lattice at this parameter
+            energy_change = energies[i_p] - close_energy[i_clp]
+            # append to dE
+            this_dE.append(energy_change)
 
-            print('nk=' + str(nk))
-            print(this_dE)
+        print('nk=' + str(nk))
+        print(this_dE)
 
-            if plot:
-                plot_xy(close_atoms_parameters, this_dE, pwi_parameter + ' and scf energy,' +
-                        str(self.atoms.symbols), legend="k-grid=" + str(nk),
-                        xtitle=pwi_parameter,
-                        ytitle="$E(a)-E(({:.3f}, {:.3f}, {:.3f}).a)$ (Ry)".format(*small_sf))
+        if plot:
+            plot_xy(close_atoms_parameters, this_dE, pwi_parameter + ' and scf energy,' +
+                    str(self.atoms.symbols), legend="k-grid=" + str(nk),
+                    xtitle=pwi_parameter,
+                    ytitle="$E(a)-E(({:.3f}, {:.3f}, {:.3f}).a)$ (Ry)".format(*small_sf))
 
-            return [close_atoms_parameters, this_dE]
+        return [close_atoms_parameters, this_dE]
 
     def get_energy(self, atoms: bulk = None, nk=None, pwi_params=None):
         """
