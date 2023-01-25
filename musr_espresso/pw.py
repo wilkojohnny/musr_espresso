@@ -28,7 +28,7 @@ class PW(object):
     PW class -- contains everything you could ever want to do with Quantum Espresso's pw.x utility
     """
 
-    def __init__(self, pwi_params: dict, atoms: bulk, pseudopotentials: dict, nk: tuple):
+    def __init__(self, pwi_params: dict, atoms: bulk, pseudopotentials: dict, nk: tuple, qe_version=None):
         print('☕️ Welcome to musr_espresso -- DFT+mu tools for Quantum Espresso\n')
         
         # get the mpi arguments -- these are all the arguments given to the program.
@@ -40,6 +40,17 @@ class PW(object):
             pw_path_index = command_args.index('--pw_command')
             self.pw_command = command_args[pw_path_index+1]
             print(self.pw_command)
+            # try to get the pw.x version from the command, if it's not given in the arguments
+            if qe_version is None:
+                try:
+                    pw_out = subprocess.run(self.pw_command, stdin=subprocess.DEVNULL, capture_output=True)
+                    qe_version = pw_out.stdout.split()[2][2:]
+                    print('Found pw.x version ' + qe_version + '. Not what you were expecting? Change the '
+                          '--pw_command\'s directory (if using ezq, this is set in <musr_espresso>/config/ezq.conf).')
+                except (IndexError, subprocess.SubprocessError):
+                    print('Can\'t get pw.x version, sorry. Write it in yourself when you create an instance of the '
+                          'pw class. I\'ll still try to run anyway...')
+            self.qe_version = qe_version
             del command_args[pw_path_index+1]
             del command_args[pw_path_index]
         if '--mpi_command' in command_args:
@@ -229,6 +240,7 @@ class PW(object):
             if errorcode:
                 raise calculator.CalculationFailed('Calculation failed with code.' + str(errorcode))
             calc.read_results()
+            self.check_scf_accuracy()
             energy = calc.results['energy']
         except calculator.CalculationFailed:
             print('Calculation failed.')
@@ -249,6 +261,35 @@ class PW(object):
                 if energy == None:
                     print('🤒 Oh no! I can\'t even get it from the file. Something\'s gone very wrong')
         return energy
+
+    def check_scf_accuracy(self, pw_output_file='espresso.pwo'):
+        """
+        Checks the 'estimated scf accuracy' in the pw.x decreases on each iteration. If it seems to
+        decrease and then suddenly increase again, its a sign of the lowest unoccupied and highest occupied
+        states exchanging. According to the documentation, adding in a broadenign should fix this!
+        :param pw_output_file: file to check for good convergence
+        :return: True if everything is OK, False (with explanation) if there are issues.
+        """
+        with open(pw_output_file, 'r') as f:
+            accuracies = []
+            for line in f.readlines():
+                if 'estimated scf accuracy' in line:
+                    accuracies.append(float(line.split()[-2]))
+                if 'End of self-consistent calculation' in line:
+                    break
+
+        accuracy_rel_diff = [(accuracies[i-1] - accuracies[i])/accuracies[i-1] for i in range(1, len(accuracies))]
+
+        if any(accuracy_rel_diff) < 0:
+            print('Warning -- SCF error decreases and then suddenly increases. Here are the accuracies (in Ry), '
+                  'decide for yourself if you trust the results...')
+            if any(accuracy_rel_diff[2:]) < -2:
+                print('(there is a factor of two difference, so I wouldnt trust it if I were you... try adding '
+                      'in some smearing.)')
+            print(accuracies)
+
+            return False
+        return True
 
     def write_pw_input(self, atoms: bulk = None, nk = None, pwi_params = None, filename='espresso.pwi'):
         """
