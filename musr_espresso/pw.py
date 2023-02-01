@@ -43,6 +43,7 @@ class PW(object):
             self.pw_command = command_args[pw_path_index+1]
             del command_args[pw_path_index+1]
             del command_args[pw_path_index]
+        else:
             self.pw_command = 'pw.x'
         print(self.pw_command)
         # try to get the pw.x version from the command, if it's not given in the arguments
