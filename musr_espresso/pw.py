@@ -15,6 +15,7 @@ import sys
 import time
 from .pointgrid import point_grid
 from .gle_utils import plot_xy, plot_scatter, plot_bands
+from .hubbard import Hubbard
 import subprocess
 import os
 
@@ -28,7 +29,8 @@ class PW(object):
     PW class -- contains everything you could ever want to do with Quantum Espresso's pw.x utility
     """
 
-    def __init__(self, pwi_params: dict, atoms: bulk, pseudopotentials: dict, nk: tuple, qe_version=None):
+    def __init__(self, pwi_params: dict, atoms: bulk, pseudopotentials: dict, nk: tuple, qe_version=None,
+                 hubbard: Hubbard = None):
         print('☕️ Welcome to musr_espresso -- DFT+mu tools for Quantum Espresso\n')
         
         # get the mpi arguments -- these are all the arguments given to the program.
@@ -39,20 +41,22 @@ class PW(object):
         if '--pw_command' in command_args:
             pw_path_index = command_args.index('--pw_command')
             self.pw_command = command_args[pw_path_index+1]
-            print(self.pw_command)
-            # try to get the pw.x version from the command, if it's not given in the arguments
-            if qe_version is None:
-                try:
-                    pw_out = subprocess.run(self.pw_command, stdin=subprocess.DEVNULL, capture_output=True)
-                    qe_version = pw_out.stdout.split()[2][2:]
-                    print('Found pw.x version ' + qe_version + '. Not what you were expecting? Change the '
-                          '--pw_command\'s directory (if using ezq, this is set in <musr_espresso>/config/ezq.conf).')
-                except (IndexError, subprocess.SubprocessError):
-                    print('Can\'t get pw.x version, sorry. Write it in yourself when you create an instance of the '
-                          'pw class. I\'ll still try to run anyway...')
-            self.qe_version = qe_version
             del command_args[pw_path_index+1]
             del command_args[pw_path_index]
+            self.pw_command = 'pw.x'
+        print(self.pw_command)
+        # try to get the pw.x version from the command, if it's not given in the arguments
+        if qe_version is None:
+            try:
+                pw_out = subprocess.run(self.pw_command, stdin=subprocess.DEVNULL, capture_output=True)
+                qe_version = pw_out.stdout.split()[2][2:]
+                print('Found pw.x version ' + str(qe_version) + '. Not what you were expecting? Change the '
+                      '--pw_command\'s directory (if using ezq, this is set in <musr_espresso>/config/ezq.conf).')
+            except (IndexError, subprocess.SubprocessError):
+                print('Can\'t get pw.x version, sorry. Write it in yourself when you create an instance of the '
+                      'pw class. I\'ll still try to run anyway...')
+        self.qe_version = qe_version
+
         if '--mpi_command' in command_args:
             self.parallel = True
             mpi_path_index = command_args.index('--mpi_command')
@@ -68,8 +72,10 @@ class PW(object):
         else:
             print('😁 Using parallel mode. MPI options given are ' + self.mpi_args + '\n')
         self.pwi_params = pwi_params
+        self.hubbard = hubbard
         self.atoms = atoms
         self.pseudopotentials = pseudopotentials
+        self.pp_names = [item for item, _ in self.pseudopotentials.items()]
         if isinstance(nk, tuple):
             self.nk = nk
         else:
@@ -329,10 +335,10 @@ class PW(object):
 
         # find the pseudopotentials
         pp_i = lines.index('ATOMIC_SPECIES\n') + 1
-        pp_names = []
         while lines[pp_i] != '\n':
             this_line_split = lines[pp_i].split()
-            pp_names.append(this_line_split[0])
+            if not this_line_split[0] in self.pp_names:
+                self.pp_names.append(this_line_split[0])
             pp_i += 1
 
         # for each problem_key namespace...
@@ -343,12 +349,12 @@ class PW(object):
             # now add in the problem bits
             for key in list(problem_keys[namespace]):
                 species_identifier = key[key.find("(")+1:key.find(")")]
-                if species_identifier in pp_names:
+                if species_identifier in self.pp_names:
                     # the user used the atomic symbol instead of a numeric ID -- so see how many of these
                     # are in the pw.x file (there might be more than 1 for e.g AFM structures)
-                    pp_index = pp_names.index(species_identifier)
-                    while pp_index < len(pp_names):
-                        if species_identifier in pp_names[pp_index]:
+                    pp_index = self.pp_names.index(species_identifier)
+                    while pp_index < len(self.pp_names):
+                        if species_identifier in self.pp_names[pp_index]:
                             # we have a key <--> species match!
                             this_key = key.split('(')[0] + '(' + str(pp_index + 1) + ')'
                             lines.insert(namespace_line_id + 1, this_key + ' = ' + str(problem_keys[namespace][key]) + '\n')
@@ -362,6 +368,10 @@ class PW(object):
         with open(filename, 'w') as f:
             file_contents = "".join(lines)
             f.write(file_contents)
+
+            # and do the hubbard parameters if qe>=7
+            if float(self.qe_version) > 7 and self.hubbard is not None:
+                f.write(self.hubbard.qe_7_hubbard(pp_names=self.pp_names))
 
         # replace the problem keys in the dict
         for namespace in problem_keys:
