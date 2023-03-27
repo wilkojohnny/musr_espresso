@@ -122,7 +122,7 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
                 print('Final configuration written to:', filename.replace(postfix, '.cif'))
         # after reading the first file, find number of atoms to create arrays to store the detailed information
         if iterator == 0:
-            N_atoms = file_f.get_number_of_atoms()
+            N_atoms = len(file_f)
             results_detailedpandas = np.array(np.zeros((N_files, N_atoms + 2, len(results_detailedheaders))),
                                               dtype=str)  # have two extra rows for: column headers and for summary row
 
@@ -137,17 +137,17 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
         cartcoords_dist = np.sqrt((cartcoords_change * cartcoords_change).sum(
             axis=1))  # distance (in Angstrom) from final to initial position of each atom. This appears to be much faster than using linal.norm, see: https://stackoverflow.com/questions/9171158/how-do-you-get-the-magnitude-of-a-vector-in-numpy
 
-        results_summary.at[iterator, ['file_name']] = filename
+        results_summary.at[iterator, 'file_name'] = filename
         results_detailedpandas[
             iterator, range(2, N_atoms + 2), 0] = atoms_symbols  # list of chemical symbols for the ions
-        results_summary.at[iterator, ['Mu_xi', 'Mu_yi', 'Mu_zi']] = np.round(fractcoords_i[muon_index],
+        results_summary.loc[iterator, ['Mu_xi', 'Mu_yi', 'Mu_zi']] = np.round(fractcoords_i[muon_index],
                                                                              3)  # initial muon position. rounded to 3 decimals to remove floating point glitches
         results_detailedpandas[iterator, range(2, N_atoms + 2), 1:4] = np.array(np.round(fractcoords_i, 3),
                                                                                 dtype=str)  # save all initial fractional positions
-        results_summary.at[iterator, ['Mu_xf', 'Mu_yf', 'Mu_zf']] = fractcoords_f[muon_index]  # final fractional muon position
+        results_summary.loc[iterator, ['Mu_xf', 'Mu_yf', 'Mu_zf']] = fractcoords_f[muon_index]  # final fractional muon position
         # muon location in unit cell:
         mu_unit_cell = [(fractcoords_f[muon_index][i] % (1/supercell[i])) * supercell[i] for i in range(0, 3)]
-        results_summary.at[iterator, ['Mu_unit_xf', 'Mu_unit_yf', 'Mu_unit_zf']] = mu_unit_cell # final unit cell muon position
+        results_summary.loc[iterator, ['Mu_unit_xf', 'Mu_unit_yf', 'Mu_unit_zf']] = mu_unit_cell # final unit cell muon position
         results_detailedpandas[iterator, range(2, N_atoms + 2), 4:7] = np.array(fractcoords_f,
                                                                                 dtype=str)  # save all final positions
         Mu_nndist = file_f.get_distances(muon_index, range(0, N_atoms),
@@ -182,9 +182,9 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
              fractcoords_f[muon_index, 1], fractcoords_f[muon_index, 2], NN_mindist_value, 'Final', 'Energy', final_energy, 'Ry',
              final_energy * units.Ry, 'eV', final_energy * units.Ry / units.kB, 'K'], dtype=str)
 
-    results_summary.at[:, 'dE (Ry)'] = results_summary.loc[:, 'E (Ry)'] - np.amin(
+    results_summary.loc[:, 'dE (Ry)'] = results_summary.loc[:, 'E (Ry)'] - np.amin(
         results_summary.loc[:, 'E (Ry)'])  # subtract minimum energy from all other energies
-    results_summary.at[:, 'dE (K)'] = results_summary.loc[:, 'dE (Ry)'] * units.Ry / units.kB
+    results_summary.loc[:, 'dE (K)'] = results_summary.loc[:, 'dE (Ry)'] * units.Ry / units.kB
     if verbose in ['min', 'max']:
         print('\nQE output read in and summarised.')
 
@@ -228,7 +228,7 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
                                        setting=spgsetting, cell=cell, symprec=muon_multipl_prec)
         # this creates a lattice from the original (or passed) spacegroup and unit cell dimensions and with one of the final muon sites as the basis
         muon_multiplicities[
-            iterator] = muon_latt.get_number_of_atoms()  # multiplicity of final muon site, up to symmetry precision set in previous line
+            iterator] = len(muon_latt) # multiplicity of final muon site, up to symmetry precision set in previous line
         muon_latt.extend(
             muon_finalatoms)  # add all final muon sites to created lattice, in order to calculate the shortest distance between all symmetry equivalent positions of a particular muon site with all others (including itself)
         muon_distances[iterator] = np.amin(
@@ -267,7 +267,7 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
     phClust = PhylogenCluster(aColl, [gene_bonds])  # create the cluster for the given choice of gene(s)
     clust_inds, clust_slices = phClust.get_kmeans_clusters(
         ncluster)  # Returns indices and slices representing the clusters
-    results_summary.at[
+    results_summary.loc[
         range(0, N_files), 'Bond order cluster'] = clust_inds  # add clustering to the results summary table
     if verbose in ['min', 'max']:
         print('Bond order parameter clustering done with ', str(ncluster), ' clusters.')
@@ -302,8 +302,8 @@ def QErel(pwo_files, set_spg=None, set_spgsetting=None, cif_flag=True, XMufile_f
         write_csv.writerow(
             ['A (Ang)', 'B (Ang)', 'C (Ang)', 'alpha', 'beta', 'gamma', 'cell_volume (Ang^3)', 'N_atoms', 'spg H-M'])
         write_csv.writerow(np.concatenate((
-                                          resultsi_all[0].get_cell_lengths_and_angles(), [resultsi_all[0].get_volume()],
-                                          [resultsi_all[0].get_number_of_atoms()], [spg])))
+                                          resultsi_all[0].cell.cellpar(), [resultsi_all[0].get_volume()],
+                                          [len(resultsi_all[0])], [spg])))
         write_csv.writerow(['Cartesian', 'Crystal', 'Axes'])
         for axes in resultsi_all[0].get_cell():
             write_csv.writerow(axes)
