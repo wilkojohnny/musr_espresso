@@ -215,11 +215,12 @@ class PW(object):
         calc = espresso.Espresso(pseudopotentials=self.pseudopotentials, tstress=False, tprnfor=False, kpts=nk,
                                  input_data=pwi_params)
 
+        # make the pw.x command
         if self.mpi_args != '' or self.parallel==True:
-            calc.command = self.mpi_command + ' ' + self.mpi_args + ' ' + self.pw_command + ' -in PREFIX.pwi > PREFIX.pwo'
-            print(calc.command)
-        else:
-            calc.command = self.pw_command + " -in PREFIX.pwi > PREFIX.pwo"
+            calc.command = self.mpi_command + ' ' + self.mpi_args + ' '
+
+        calc.command += self.pw_command + " -in " + calc.template.inputname + " > " + calc.template.outputname
+        print(calc.command)
 
         # attach the calculator to the atoms
         atoms.set_calculator(calc)
@@ -232,16 +233,14 @@ class PW(object):
             self.write_pw_input(atoms=atoms, nk=nk, pwi_params=pwi_params)
             # the below lines are the bits copied from ASE which run the calculation (I had to copy this
             # because otherwise the file will be rewritten)
-            if 'PREFIX' in calc.command:
-                command = calc.command.replace('PREFIX', calc.prefix)
             try:
-                proc = subprocess.Popen(command, shell=True, cwd=calc.directory)
+                proc = subprocess.Popen(calc.command, shell=True, cwd=calc.directory)
             except OSError as err:
                 # Actually this may never happen with shell=True, since
                 # probably the shell launches successfully.  But we soon want
                 # to allow calling the subprocess directly, and then this
                 # distinction (failed to launch vs failed to run) is useful.
-                msg = 'Failed to execute "{}"'.format(command)
+                msg = 'Failed to execute "{}"'.format(calc.command)
                 raise EnvironmentError(msg) from err
             errorcode = proc.wait()
             if errorcode:
