@@ -218,6 +218,8 @@ class PW(object):
         # make the pw.x command
         if self.mpi_args != '' or self.parallel==True:
             calc.command = self.mpi_command + ' ' + self.mpi_args + ' '
+        else:
+            calc.command = ''
 
         calc.command += self.pw_command + " -in " + calc.template.inputname + " > " + calc.template.outputname
         print(calc.command)
