@@ -50,7 +50,16 @@ class PW(object):
         if qe_version is None:
             try:
                 pw_out = subprocess.run(self.pw_command, stdin=subprocess.DEVNULL, capture_output=True)
-                qe_version = pw_out.stdout.split()[2][2:]
+                for i_line, potential_v_line in enumerate(str(pw_out.stdout).split('\\n')):
+                    if i_line > 20:
+                        raise IndexError
+                    line_components = potential_v_line.split()
+                    try:
+                        if line_components[0] == 'Program' and line_components[1] == 'PWSCF':
+                            qe_version = line_components[2][2:]
+                            break
+                    except IndexError:
+                        continue
                 print('Found pw.x version ' + str(qe_version) + '. Not what you were expecting? Change the '
                       '--pw_command\'s directory (if using ezq, this is set in <musr_espresso>/config/ezq.conf).')
             except (IndexError, subprocess.SubprocessError):
