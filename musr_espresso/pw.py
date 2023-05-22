@@ -18,6 +18,7 @@ from .gle_utils import plot_xy, plot_scatter, plot_bands
 from .hubbard import Hubbard
 import subprocess
 import os
+from pathlib import Path
 
 
 import functools
@@ -49,7 +50,12 @@ class PW(object):
         # try to get the pw.x version from the command, if it's not given in the arguments
         if qe_version is None:
             try:
-                pw_out = subprocess.run(self.pw_command, stdin=subprocess.DEVNULL, capture_output=True)
+                try:
+                    # try without shell=True initially
+                    pw_out = subprocess.run(self.pw_command, stdin=subprocess.DEVNULL, capture_output=True)
+                except FileNotFoundError:
+                    pw_out = subprocess.run(self.pw_command, stdin=subprocess.DEVNULL, capture_output=True,
+                                            shell=True)
                 for i_line, potential_v_line in enumerate(str(pw_out.stdout).split('\\n')):
                     if i_line > 20:
                         raise IndexError
@@ -256,7 +262,7 @@ class PW(object):
             errorcode = proc.wait()
             if errorcode:
                 raise calculator.CalculationFailed('Calculation failed with code.' + str(errorcode))
-            calc.template.read_results()
+            calc.results = calc.template.read_results(directory=Path(os.getcwd()))
             self.check_scf_accuracy()
             energy = calc.results['energy']
         except calculator.CalculationFailed:
