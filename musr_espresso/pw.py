@@ -18,6 +18,7 @@ from .gle_utils import plot_xy, plot_scatter, plot_bands
 from .hubbard import Hubbard
 import subprocess
 import os
+from pathlib import Path
 
 
 import functools
@@ -256,7 +257,7 @@ class PW(object):
             errorcode = proc.wait()
             if errorcode:
                 raise calculator.CalculationFailed('Calculation failed with code.' + str(errorcode))
-            calc.template.read_results(directory=os.getcwd())
+            calc.template.read_results(directory=Path(os.getcwd()))
             self.check_scf_accuracy()
             energy = calc.results['energy']
         except calculator.CalculationFailed:
