@@ -50,7 +50,12 @@ class PW(object):
         # try to get the pw.x version from the command, if it's not given in the arguments
         if qe_version is None:
             try:
-                pw_out = subprocess.run(self.pw_command, stdin=subprocess.DEVNULL, capture_output=True)
+                try:
+                    # try without shell=True initially
+                    pw_out = subprocess.run(self.pw_command, stdin=subprocess.DEVNULL, capture_output=True)
+                except FileNotFoundError:
+                    pw_out = subprocess.run(self.pw_command, stdin=subprocess.DEVNULL, capture_output=True,
+                                            shell=True)
                 for i_line, potential_v_line in enumerate(str(pw_out.stdout).split('\\n')):
                     if i_line > 20:
                         raise IndexError
