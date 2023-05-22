@@ -256,7 +256,7 @@ class PW(object):
             errorcode = proc.wait()
             if errorcode:
                 raise calculator.CalculationFailed('Calculation failed with code.' + str(errorcode))
-            calc.template.read_results()
+            calc.template.read_results(directory=os.getcwd())
             self.check_scf_accuracy()
             energy = calc.results['energy']
         except calculator.CalculationFailed:
