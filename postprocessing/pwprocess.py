@@ -1,4 +1,3 @@
-#!/opt/anaconda3/envs/qe_env/bin/python3
 import argparse
 import os
 import sys
