@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# Usage: ./cppos *.pwo
+# For each file.pwo, replaces the ATOMIC_POSITIONS block in file.pwi
+# with the FINAL coordinates from the QE output.
+# Strategy:
+# 1) Prefer the block inside "Begin final coordinates ... End final coordinates" if present.
+# 2) Otherwise, take the LAST ATOMIC_POSITIONS block in the .pwo.
+# 3) Replace the ATOMIC_POSITIONS block in the .pwi (keeping everything else intact).
+
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 file1.pwo [file2.pwo ...]"
+  exit 1
+fi
+
+atomic_line_regex='^[[:space:]]*[A-Za-z][A-Za-z0-9._-]*[[:space:]]+[-+0-9.eEdDd]+[[:space:]]+[-+0-9.eEdDd]+[[:space:]]+[-+0-9.eEdDd]+'
+
+for pwo in "$@"; do
+  if [[ "$pwo" != *.pwo* ]]; then
+    echo "Skipping $pwo (not matching .pwo pattern)"
+    continue
+  fi
+
+  if [ ! -f "$pwo" ]; then
+    echo "Error: $pwo not found."
+    continue
+  fi
+
+  # Remove trailing digits after .pwo (e.g., "calc.pwo3" -> "calc.pwo" -> "calc.pwi")
+  pwi="${pwo%.pwo*}.pwi"
+
+  if [ ! -f "$pwi" ]; then
+    echo "Error: matching input $pwi not found for $pwo"
+    continue
+  fi
+
+  tmp="$(mktemp)"
+  coords="$(mktemp)"
+
+  # --- 1) Try to grab FINAL coordinates from the explicit final-coords section ---
+  awk -v IGNORECASE=1 -v re="$atomic_line_regex" '
+    BEGIN { infinal=0; grabbing=0; have=0; block=""; last="" }
+    /Begin final coordinates/ { infinal=1 }
+    /End final coordinates/   { infinal=0; if (grabbing) { have=1; last=block; grabbing=0 } }
+    infinal && /^[[:space:]]*ATOMIC_POSITIONS/ { grabbing=1; block=$0 ORS; next }
+    grabbing {
+      if ($0 ~ re) { block = block $0 ORS }
+      else { have=1; last=block; grabbing=0 }
+      next
+    }
+    END { if (have) print last }
+  ' "$pwo" > "$coords"
+
+  # --- 2) Fallback: take the LAST ATOMIC_POSITIONS block in the whole file ---
+  if [ ! -s "$coords" ]; then
+    awk -v re="$atomic_line_regex" '
+      BEGIN { grabbing=0; have=0; block=""; last="" }
+      /^[[:space:]]*ATOMIC_POSITIONS/ { grabbing=1; block=$0 ORS; next }
+      grabbing {
+        if ($0 ~ re) { block = block $0 ORS }
+        else { have=1; last=block; grabbing=0 }
+        next
+      }
+      END {
+        if (grabbing) { have=1; last=block }
+        if (have) print last
+      }
+    ' "$pwo" > "$coords"
+  fi
+
+  if [ ! -s "$coords" ]; then
+    echo "Error: Could not find final ATOMIC_POSITIONS in $pwo"
+    rm -f "$coords" "$tmp"
+    continue
+  fi
+
+  # Determine how many atoms are in the input block
+  nat_in="$(awk -v re="$atomic_line_regex" '
+    BEGIN { inblock=0; n=0 }
+    /^[[:space:]]*ATOMIC_POSITIONS/ { inblock=1; next }
+    inblock {
+      if ($0 ~ re) { n++ ; next }
+      if ($0 ~ /^[[:space:]]*$/ || $1 ~ /^[A-Z_][A-Z0-9_]*(\(|$)/) { inblock=0 }
+    }
+    END { print n }
+  ' "$pwi")"
+
+  # --- 3) Replace the ATOMIC_POSITIONS block in the .pwi ---
+  awk -v newblock="$(<"$coords")" -v nat="$nat_in" -v re="$atomic_line_regex" '
+    BEGIN { skip=0; inpat=0; found=0 }
+    {
+      if (skip>0) { skip--; next }
+      if (inpat==1) {
+        if ($0 ~ /^[[:space:]]*$/ || $1 ~ /^[A-Z_][A-Z0-9_]*(\(|$)/) { print; inpat=0; next }
+        else next
+      }
+      if ($0 ~ /^[[:space:]]*ATOMIC_POSITIONS/) {
+        print newblock
+        found=1
+        if (nat+0 > 0) { skip = nat; next }
+        else { inpat=1; next }
+      }
+      print
+    }
+    END {
+      if (found==0) {
+        exit 2
+      }
+    }
+  ' "$pwi" > "$tmp" || {
+    status=$?
+    if [ $status -eq 2 ]; then
+      echo "Error: No ATOMIC_POSITIONS block found in $pwi (nothing replaced)."
+    else
+      echo "Error: awk failed updating $pwi"
+    fi
+    rm -f "$coords" "$tmp"
+    continue
+  }
+
+  mv "$tmp" "$pwi"
+  rm -f "$coords"
+  echo "✅ Updated $pwi using final coordinates from $pwo"
+done
